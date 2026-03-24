@@ -12,6 +12,18 @@
         button:hover { opacity: 0.8; transform: translateY(-1px); }
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
+        /* ダメージ演出 */
+.shake { animation: shake-anim 0.3s; }
+.hit-flash { animation: flash-anim 0.2s; }
+@keyframes shake-anim {
+    0%, 100% { transform: translate(0,0); }
+    25% { transform: translate(-10px,0); }
+    75% { transform: translate(10px,0); }
+}
+@keyframes flash-anim {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(3); }
+}
         /* ダメージを受けた時の揺れ */
 .shake {
     animation: shake-anim 0.3s;
