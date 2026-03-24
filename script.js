@@ -620,3 +620,52 @@ bgmHooks.forEach(funcName => {
 
 // 4. 起動時
 setTimeout(syncBGM, 500);
+
+/* --- 機能追加：音量・SE・アニメーション --- */
+
+// 効果音の読み込み（point.mp3をアップロードしておいてください）
+const sePoint = new Audio('point.mp3'); 
+
+// 1. 音量調節の連動
+const volSlider = document.getElementById('volume-slider');
+volSlider.addEventListener('input', (e) => {
+    const vol = e.target.value;
+    // BGMの音量を一括更新
+    [trackField, trackBattle, trackBoss].forEach(s => s.volume = vol);
+    // 効果音の音量も合わせる
+    sePoint.volume = vol;
+});
+
+// 2. ポイントを振った時に音を出す
+// あなたのコード内の「ポイントを増やすボタン」の処理に割り込みます
+const originalAddPoint = window.addPoint; // 元々のポイント増加関数名に合わせてください
+window.addPoint = function(stat) {
+    if (originalAddPoint) originalAddPoint(stat);
+    
+    // 音を再生（再生中の場合は巻き戻して鳴らす）
+    sePoint.currentTime = 0;
+    sePoint.play().catch(() => {});
+};
+
+// 3. 戦闘アニメーション
+// 攻撃がヒットした瞬間に呼び出す関数
+function playHitAnimation(isEnemyTarget) {
+    // 敵を揺らすか、自分を揺らすか
+    const targetId = isEnemyTarget ? 'enemy-monster-canvas' : 'player-monster-canvas';
+    const element = document.getElementById(targetId);
+    
+    if (element) {
+        // クラスを一度消して、再度つけることでアニメーションを再生
+        element.classList.remove('shake', 'hit-flash');
+        void element.offsetWidth; // リフロー発生（おまじない）
+        element.classList.add('shake', 'hit-flash');
+    }
+}
+
+// 既存のバトルログ表示やダメージ計算のところにアニメーションを割り込ませる
+const originalBattleLog = window.updateBattleLog; // バトル進行関数
+if (window.setupBattle) {
+    // 攻撃処理が行われるたびにアニメを流すように改造
+    // ※あなたのバトルの仕組み（attack関数など）に合わせて調整が必要です
+    // 例：ダメージが発生する場所に playHitAnimation(true); を追記する
+}
