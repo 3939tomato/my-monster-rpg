@@ -670,76 +670,80 @@ if (window.setupBattle) {
     // 例：ダメージが発生する場所に playHitAnimation(true); を追記する
 }
 
-/* --- 安全版：BGM・SE・設定・アニメ管理 --- */
+/* --- 【完全統合版】BGM・SE・設定システム --- */
 
-// 1. 音源の準備
-const trackField = new Audio('so_sweet.mp3');
-const trackBattle = new Audio('Quick_pipes.mp3');
-const trackBoss = new Audio('Battle_in_the_Moonlight.mp3');
-const sePoint = new Audio('point.mp3'); // ファイルがないと鳴りませんがエラーにはなりません
+// --- 1. 音源の定義（重複エラー防止のため一度だけ定義） ---
+// もし他で定義していても上書きするように window オブジェクトに持たせます
+window.gameAudio = {
+    field: new Audio('so_sweet.mp3'),
+    battle: new Audio('Quick_pipes.mp3'),
+    boss: new Audio('Battle_in_the_Moonlight.mp3'),
+    sePoint: new Audio('point.mp3')
+};
 
-// 音量の初期値
+// 初期設定
 let volBGM = 0.08;
 let volSE = 0.5;
 
-const allBGM = [trackField, trackBattle, trackBoss];
-allBGM.forEach(s => { s.loop = true; s.volume = volBGM; });
+const allBGMTracks = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
+allBGMTracks.forEach(s => { s.loop = true; s.volume = volBGM; });
 
-// 2. 設定画面の制御（エラー防止付き）
+// --- 2. 設定画面の連動（ボタンがある場合のみ動作） ---
 const btnSet = document.getElementById('settings-btn');
 const modalSet = document.getElementById('settings-modal');
 const btnClose = document.getElementById('settings-close');
 const sliBGM = document.getElementById('bgm-slider');
 const sliSE = document.getElementById('se-slider');
 
-if (btnSet && modalSet) btnSet.onclick = () => modalSet.style.display = 'flex';
-if (btnClose && modalSet) btnClose.onclick = () => modalSet.style.display = 'none';
+if (btnSet) btnSet.onclick = () => { if(modalSet) modalSet.style.display = 'flex'; };
+if (btnClose) btnClose.onclick = () => { if(modalSet) modalSet.style.display = 'none'; };
 
 if (sliBGM) {
     sliBGM.oninput = (e) => {
         volBGM = e.target.value;
-        allBGM.forEach(s => s.volume = volBGM);
+        allBGMTracks.forEach(s => s.volume = volBGM);
     };
 }
 if (sliSE) {
     sliSE.oninput = (e) => {
         volSE = e.target.value;
-        sePoint.volume = volSE;
+        window.gameAudio.sePoint.volume = volSE;
     };
 }
 
-// 3. 画面に合わせたBGM再生（お絵描き中は停止）
-function updateGameAudio() {
-    allBGM.forEach(s => s.pause());
+// --- 3. BGM切り替えロジック ---
+function updateGameMusic() {
+    allBGMTracks.forEach(s => s.pause());
 
     const isEditor = document.getElementById('editor-view')?.style.display !== 'none';
     const isBattle = document.getElementById('battle-screen')?.style.display !== 'none';
     const isField = document.getElementById('field-view')?.style.display !== 'none';
 
-    if (isEditor) return; // お絵描き中は停止
+    if (isEditor) return; // お絵描き中は無音
 
     if (isBattle) {
         const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
-        if (isBoss) trackBoss.play().catch(() => {});
-        else trackBattle.play().catch(() => {});
+        if (isBoss) window.gameAudio.boss.play().catch(() => {});
+        else window.gameAudio.battle.play().catch(() => {});
     } else if (isField) {
-        trackField.play().catch(() => {});
+        window.gameAudio.field.play().catch(() => {});
     }
 }
 
-// クリックで音を更新
-document.addEventListener('click', () => setTimeout(updateGameAudio, 100));
+// クリック時に音を更新
+document.addEventListener('click', () => setTimeout(updateGameMusic, 100));
 
-// 4. ポイント振りの効果音
-const originalAddPoint = window.addPoint;
+// --- 4. ポイント振りの効果音割り込み ---
+const oldAddPoint = window.addPoint;
 window.addPoint = function(stat) {
-    if (originalAddPoint) originalAddPoint(stat);
-    sePoint.currentTime = 0;
-    sePoint.volume = volSE;
-    sePoint.play().catch(() => {});
+    if (oldAddPoint) oldAddPoint(stat);
+    const s = window.gameAudio.sePoint;
+    s.currentTime = 0;
+    s.volume = volSE;
+    s.play().catch(() => {});
 };
 
-// 5. 戦闘アニメ関数
+// --- 5. 戦闘アニメーション関数 ---
 window.playHitAnimation = function(isEnemy) {
     const id = isEnemy ? 'enemy-monster-canvas' : 'player-monster-canvas';
     const el = document.getElementById(id);
@@ -750,13 +754,4 @@ window.playHitAnimation = function(isEnemy) {
     }
 };
 
-// 6. 戦闘アニメーション（前回の内容）
-function playHitAnimation(isEnemyTarget) {
-    const targetId = isEnemyTarget ? 'enemy-monster-canvas' : 'player-monster-canvas';
-    const el = document.getElementById(targetId);
-    if (el) {
-        el.classList.remove('shake', 'hit-flash');
-        void el.offsetWidth; 
-        el.classList.add('shake', 'hit-flash');
-    }
-}
+console.log("Audio System Loaded: 準備完了！");
