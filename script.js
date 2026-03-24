@@ -554,9 +554,10 @@ function renderBattleUnits() {
 /* --- BGM再生システム（ローカルファイル版） --- */
 
 // 1. ファイル名でオーディオを定義（./ をつけて同じフォルダであることを強制的に教える）
-const fieldBGM = new Audio('./so_sweet.mp3');            // 草原
-const battleBGM = new Audio('./Quick_pipes.mp3');        // 通常戦闘
-const bossBGM = new Audio('./Battle_in_the_Moonlight.mp3'); // ボス戦
+// GitHubでは「ファイル名だけ」が一番安全です
+const fieldBGM = new Audio('so_sweet.mp3');
+const battleBGM = new Audio('Quick_pipes.mp3');
+const bossBGM = new Audio('Battle_in_the_Moonlight.mp3');
 
 [fieldBGM, battleBGM, bossBGM].forEach(a => { 
     a.loop = true; 
