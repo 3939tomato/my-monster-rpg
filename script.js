@@ -669,3 +669,59 @@ if (window.setupBattle) {
     // ※あなたのバトルの仕組み（attack関数など）に合わせて調整が必要です
     // 例：ダメージが発生する場所に playHitAnimation(true); を追記する
 }
+
+/* --- 音量・設定・SE管理システム --- */
+
+// 1. 変数の準備
+let bgmVolume = 0.08;
+let seVolume = 0.5;
+
+const trackField = new Audio('so_sweet.mp3');
+const trackBattle = new Audio('Quick_pipes.mp3');
+const trackBoss = new Audio('Battle_in_the_Moonlight.mp3');
+const sePoint = new Audio('point.mp3'); // ポイント振りの音（GitHubに上げておいてね！）
+
+const allBGM = [trackField, trackBattle, trackBoss];
+allBGM.forEach(s => { s.loop = true; s.volume = bgmVolume; });
+
+// 2. 設定画面の開閉ロジック
+const modal = document.getElementById('settings-modal');
+document.getElementById('settings-btn').onclick = () => { modal.style.display = 'flex'; };
+document.getElementById('settings-close').onclick = () => { modal.style.display = 'none'; };
+
+// 3. スライダーとの連動
+document.getElementById('bgm-slider').oninput = (e) => {
+    bgmVolume = e.target.value;
+    allBGM.forEach(s => s.volume = bgmVolume);
+};
+
+document.getElementById('se-slider').oninput = (e) => {
+    seVolume = e.target.value;
+    sePoint.volume = seVolume; // 効果音の音量だけ変える
+};
+
+// 4. 効果音を鳴らす関数（SE用）
+function playSE(audioObj) {
+    audioObj.pause();
+    audioObj.currentTime = 0;
+    audioObj.volume = seVolume; // 最新のSE音量を適用
+    audioObj.play().catch(() => {});
+}
+
+// 5. ポイント振りにSEを割り込ませる
+const oldAddPoint = window.addPoint; 
+window.addPoint = function(stat) {
+    if (oldAddPoint) oldAddPoint(stat);
+    playSE(sePoint); // ピコン！
+};
+
+// 6. 戦闘アニメーション（前回の内容）
+function playHitAnimation(isEnemyTarget) {
+    const targetId = isEnemyTarget ? 'enemy-monster-canvas' : 'player-monster-canvas';
+    const el = document.getElementById(targetId);
+    if (el) {
+        el.classList.remove('shake', 'hit-flash');
+        void el.offsetWidth; 
+        el.classList.add('shake', 'hit-flash');
+    }
+}
