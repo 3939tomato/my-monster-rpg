@@ -551,68 +551,72 @@ function renderBattleUnits() {
     });
 }
 
-/* --- 【完全版】BGM切り替え・GitHub対応コード --- */
+/* --- 【決定版】BGM管理システム（お絵描き中は消音） --- */
 
-// 1. オーディオの準備（パスを確実に通す）
-const sndField = new Audio('so_sweet.mp3');
-const sndBattle = new Audio('Quick_pipes.mp3');
-const sndBoss = new Audio('Battle_in_the_Moonlight.mp3');
+// 1. 音源の定義
+const trackField = new Audio('so_sweet.mp3');
+const trackBattle = new Audio('Quick_pipes.mp3');
+const trackBoss = new Audio('Battle_in_the_Moonlight.mp3');
 
-// 初期設定（ループ・音量8%）
-[sndField, sndBattle, sndBoss].forEach(s => {
+[trackField, trackBattle, trackBoss].forEach(s => {
     s.loop = true;
-    s.volume = 0.08;
+    s.volume = 0.08; // 音量8%
 });
 
-// 2. 再生管理関数
-function changeMusic() {
-    // 全て停止
-    [sndField, sndBattle, sndBoss].forEach(s => {
+// 2. 状態をチェックして曲を変えるメイン関数
+function syncBGM() {
+    // 一旦すべての曲を止める
+    [trackField, trackBattle, trackBoss].forEach(s => {
         s.pause();
-        // エラー防止のため再生位置リセットは慎重に
-        try { s.currentTime = 0; } catch(e) {}
     });
 
-    const fieldVisible = document.getElementById('field-view').style.display !== 'none';
-    const battleVisible = document.getElementById('battle-screen')?.style.display !== 'none';
+    // 各画面の表示状態を取得
+    const isEditor = document.getElementById('editor-view').style.display !== 'none'; // お絵描き画面
+    const isBattle = document.getElementById('battle-screen').style.display !== 'none'; // バトル画面
+    const isField = document.getElementById('field-view').style.display !== 'none'; // 草原画面
 
-    if (fieldVisible) {
-        sndField.play().catch(() => console.log("再生待ち..."));
-    } else if (battleVisible) {
-        // 10階ごとのボス判定
-        const isBossFloor = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
-        if (isBossFloor) {
-            sndBoss.play().catch(() => {});
+    // 優先順位をつけて再生
+    if (isEditor) {
+        // お絵描き中は何も流さない（すべて停止のまま）
+        console.log("BGM: お絵描き中につき停止");
+    } 
+    else if (isBattle) {
+        // バトル中：10階ごとのボス判定
+        const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
+        if (isBoss) {
+            trackBoss.play().catch(() => {});
+            console.log("BGM: ボス戦開始");
         } else {
-            sndBattle.play().catch(() => {});
+            trackBattle.play().catch(() => {});
+            console.log("BGM: 通常バトル開始");
         }
+    } 
+    else if (isField) {
+        // 草原
+        trackField.play().catch(() => {});
+        console.log("BGM: 草原");
     }
 }
 
-// 3. 全てのボタン操作に「曲変更」を割り込ませる（最強の力技）
-document.addEventListener('click', (e) => {
-    // 画面が切り替わるのを少し待ってから判定
-    setTimeout(changeMusic, 150);
+// 3. 画面が切り替わる「きっかけ」すべてにこの関数を当てる
+// どこをクリックしても、画面状態をチェックして曲を合わせ直す（最強の力技）
+document.addEventListener('click', () => {
+    // 画面の切り替わりアニメーション待ちとして0.1秒後に実行
+    setTimeout(syncBGM, 100);
 });
 
-// 4. バトル開始や階層移動の関数を直接フックする
-const originalSetup = window.setupBattle;
-window.setupBattle = function() {
-    if(originalSetup) originalSetup();
-    setTimeout(changeMusic, 100);
-};
+// 各種重要関数が終わった後にも念のため実行
+const bgmHooks = ['setupBattle', 'nextFloor', 'exitDungeon', 'goToField', 'editMonster'];
+bgmHooks.forEach(funcName => {
+    if (window[funcName]) {
+        const original = window[funcName];
+        window[funcName] = function(...args) {
+            const result = original.apply(this, args);
+            setTimeout(syncBGM, 150);
+            return result;
+        };
+    }
+});
 
-const originalNext = window.nextFloor;
-window.nextFloor = function() {
-    if(originalNext) originalNext();
-    setTimeout(changeMusic, 100);
-};
-
-const originalExit = window.exitDungeon;
-window.exitDungeon = function() {
-    if(originalExit) originalExit();
-    setTimeout(changeMusic, 100);
-};
-
-// 起動時に1回実行
-setTimeout(changeMusic, 1000);
+// 4. 起動時
+setTimeout(syncBGM, 500);
