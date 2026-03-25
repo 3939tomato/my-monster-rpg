@@ -296,7 +296,6 @@ async function runTurn() {
             if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
 
-            // --- 特殊行動: ドラゴンの全体攻撃 (25%) ---
             if (u.isBoss && Math.random() < 0.25) {
                 addLog(`<b style="color:red;">ドラゴンの全体攻撃！</b>`);
                 playBattleAnimation(u, null); 
@@ -308,8 +307,6 @@ async function runTurn() {
                 }
             } else {
                 let target = targets[Math.floor(Math.random() * targets.length)];
-                
-                // 回避計算: (防御側の速さ - 攻撃側の速さ)
                 let evadeProb = Math.max(0, target.params.speed - u.params.speed);
                 if (Math.random() * 100 < evadeProb) {
                     addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
@@ -321,8 +318,6 @@ async function runTurn() {
 
                     target.curHp -= dmg;
                     addLog(`${target.name}に${dmg}ダメ`);
-                    
-                    // アニメーション実行
                     playBattleAnimation(u, target);
 
                     if (u.trait && !target.isBoss) {
@@ -359,8 +354,6 @@ function renderBattleUnits() {
     const layer = document.getElementById('battle-unit-layer'); layer.innerHTML = '';
     [...playerParty, ...enemyParty].forEach((u) => {
         if (u.curHp <= 0) return;
-        
-        // 重なり防止の配置
         const idx = (u.side === 'p') ? playerParty.indexOf(u) : enemyParty.indexOf(u);
         const topPos = (u.side === 'p') ? (35 + idx * 22) : (30 + idx * 25);
         const leftPos = (u.side === 'p') ? (25 - (idx % 2) * 5) : (75 + (idx % 2) * 5);
@@ -385,11 +378,10 @@ function playBattleAnimation(attacker, target) {
         const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
         if (atkEl) {
             atkEl.classList.remove('anim-attack');
-            void atkEl.offsetWidth; // 強制リフロー
+            void atkEl.offsetWidth; // 3度確認: アニメーションを再発火させるためのリフロー
             atkEl.classList.add('anim-attack');
         }
     }
-    
     if (target) {
         const tgtEl = document.getElementById('unit-' + String(target.id).replace('.',''));
         if (tgtEl) {
@@ -423,5 +415,4 @@ function updateGameMusic() {
         window.gameAudio.field.play().catch(()=>{});
     }
 }
-
 document.addEventListener('click', () => { updateGameMusic(); }, { once: false });
