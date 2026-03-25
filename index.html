@@ -13,26 +13,24 @@
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
 
-        /* --- アニメーション設定（元の位置 -50%,-50% に必ず戻る） --- */
         .anim-attack { animation: attack-jump 0.3s ease-out; }
         @keyframes attack-jump {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(-50%, calc(-50% - 40px)); } /* 上に跳ねる */
+            50% { transform: translate(-50%, calc(-50% - 40px)); }
         }
 
         .anim-damage-p { animation: damage-kb-p 0.3s ease-out; }
         @keyframes damage-kb-p {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% - 30px), -50%); } /* 左に弾かれる */
+            50% { transform: translate(calc(-50% - 30px), -50%); }
         }
 
         .anim-damage-e { animation: damage-kb-e 0.3s ease-out; }
         @keyframes damage-kb-e {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% + 30px), -50%); } /* 右に弾かれる */
+            50% { transform: translate(calc(-50% + 30px), -50%); }
         }
 
-        /* --- エディタ --- */
         #editor-view { display: none; width: 100%; height: 100%; position: relative; flex-direction: column; background: #333; }
         #canvas-container { flex: 1; width: 100%; height: 100%; overflow: hidden; position: relative; background: #222; }
         canvas { 
@@ -47,13 +45,11 @@
         #zoom-panel { bottom: 20px; right: 20px; flex-direction: column; }
         #status-display { position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.5); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 90;}
 
-        /* --- フィールド --- */
         #field-view { width: 100%; height: 100%; position: relative; overflow: hidden; background-color: #8dbd5d; }
         #monster-field-area { width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; }
         #btn-to-book { position: absolute; top: 20px; left: 20px; background: #5d4037; color: white; border: 3px solid #3e2723; z-index: 10; padding: 10px 20px; }
         .monster { position: absolute; image-rendering: pixelated; transform: translate(-50%, -50%); z-index: 5; }
 
-        /* --- 図鑑モーダル --- */
         #book-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         #book-content { background: #fdf5e6; border: 6px solid #5d4037; width: 95%; max-width: 650px; padding: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
         #monster-list { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
@@ -61,7 +57,6 @@
         .item-main { display: flex; align-items: center; gap: 15px; }
         .name-input { border: 1px solid #ccc; padding: 4px; border-radius: 4px; width: 100px; font-size: 14px; }
 
-        /* --- 戦闘画面 --- */
         #battle-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #444; z-index: 2000; color: white; font-family: monospace; }
         #battle-area { 
             height: 100%; width: 100%; position: relative; overflow: hidden; background-color: #bbb;
@@ -71,7 +66,6 @@
         #battle-log { position: absolute; top: 10px; left: 10px; width: 250px; height: 180px; background: rgba(0, 0, 0, 0.7); padding: 10px; font-size: 12px; overflow-y: scroll; border: 1px solid #888; border-radius: 5px; z-index: 2100; }
         #battle-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 2100; }
 
-        /* --- 階層選択 --- */
         #floor-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 4000; align-items: center; justify-content: center; }
         #floor-content { background: #333; color: white; padding: 30px; border: 4px solid #fff; border-radius: 15px; text-align: center; }
 
