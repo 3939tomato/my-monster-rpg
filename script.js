@@ -3,7 +3,6 @@ let editingMonsterId = null;
 const MAX_MONSTERS = 5; 
 const MAX_PARTY = 3;    
 
-// 敵画像
 const ENEMY_IMAGES = ['スケルトン.png', 'ゾンビ.png', 'ブルースライム.png', 'レッドスライム.png'];
 const BOSS_IMAGE = 'ドラゴン.png';
 
@@ -22,9 +21,9 @@ window.onload = () => {
     const saved = localStorage.getItem('dot_monsters');
     if (saved) {
         monsters = JSON.parse(saved);
-        renderMonsterList();
-        spawnMonstersInField();
     }
+    renderMonsterList();
+    spawnMonstersInField(); // 草原にモンスターを表示
     initCanvas();
     resetView();
     setupCanvasEvents();
@@ -129,6 +128,7 @@ document.getElementById('btn-save-monster').onclick = () => {
         monsters.push({ id: Date.now(), image: dataUrl, size: currentGridSize, level: 1, points: 1, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
     }
     saveAndRefresh();
+    spawnMonstersInField();
     goToField();
 };
 
@@ -199,11 +199,15 @@ function openBookModal() { renderMonsterList(); document.getElementById('book-mo
 function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
 
 function spawnMonstersInField() {
-    const area = document.getElementById('monster-field-area'); area.innerHTML = '';
+    const area = document.getElementById('monster-field-area'); 
+    area.innerHTML = '';
     monsters.forEach(m => {
         const img = document.createElement('img'); img.src = m.image; img.className = 'monster';
-        img.style.left = (20 + Math.random() * 60) + '%'; img.style.top = (30 + Math.random() * 50) + '%';
-        img.style.width = (m.size * 2) + 'px'; area.appendChild(img); animateMonster(img);
+        img.style.left = (20 + Math.random() * 60) + '%'; 
+        img.style.top = (30 + Math.random() * 50) + '%';
+        img.style.width = (m.size * 2) + 'px'; 
+        area.appendChild(img); 
+        animateMonster(img);
     });
 }
 function animateMonster(el) {
@@ -228,12 +232,18 @@ function setupBattle() {
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p' }));
+    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: '仲間' }));
     enemyParty = [];
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
-        const img = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
-        enemyParty.push({ id: Math.random(), image: img, params: { power: enemyLv, speed: enemyLv, hp: enemyLv }, curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss });
+        const imgName = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
+        enemyParty.push({ 
+            id: Math.random(), 
+            image: imgName, 
+            name: imgName.replace('.png', ''), // 名前を表示用にセット
+            params: { power: enemyLv, speed: enemyLv, hp: enemyLv }, 
+            curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss 
+        });
     }
     battleActive = true; renderBattleUnits(); runTurn();
 }
@@ -249,10 +259,10 @@ async function runTurn() {
             let target = targets[Math.floor(Math.random() * targets.length)];
             
             if (Math.random() * 100 < target.params.speed) {
-                addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ...回避された`);
+                addLog(`${u.name}の攻撃！ ...回避された`);
             } else {
                 let dmg = u.params.power; target.curHp -= dmg;
-                addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ${dmg}ダメ`);
+                addLog(`${u.name}の攻撃！ ${target.name}に${dmg}ダメ`);
                 if(window.playHitAnimation) window.playHitAnimation();
             }
             renderBattleUnits();
@@ -276,16 +286,19 @@ function exitDungeon() { battleActive = false; document.getElementById('battle-s
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
 function renderBattleUnits() {
-    const area = document.getElementById('battle-area'); area.innerHTML = '';
+    const layer = document.getElementById('battle-unit-layer'); layer.innerHTML = '';
     [...playerParty, ...enemyParty].forEach((u, i) => {
         if (u.curHp <= 0) return;
         const div = document.createElement('div');
-        div.style = `position:absolute; left:${u.side=='p'?'20%':'70%'}; top:${20 + (i%3)*25}%; text-align:center;`;
+        div.style = `position:absolute; left:${u.side=='p'?'25%':'75%'}; top:${30 + (i%3)*20}%; text-align:center; transform:translate(-50%,-50%);`;
         div.innerHTML = `
-            <div style="width:40px; height:4px; background:red; margin:auto;"><div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div></div>
-            <img src="${u.image}" style="width:50px; image-rendering:pixelated;">
+            <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black; margin-bottom:2px;">${u.name}</div>
+            <div style="width:40px; height:4px; background:red; margin:auto; border:1px solid #000;">
+                <div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div>
+            </div>
+            <img src="${u.image}" style="width:80px; image-rendering:pixelated; ${u.side=='e'?'transform: scaleX(-1);':''}">
         `;
-        area.appendChild(div);
+        layer.appendChild(div);
     });
 }
 
