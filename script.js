@@ -233,7 +233,6 @@ function animateMonster(el) {
 let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
 let battleSpeed = 1;
 
-// 階層選択機能
 function openFloorSelect() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
@@ -241,13 +240,11 @@ function openFloorSelect() {
     const select = document.getElementById('floor-select-dropdown');
     select.innerHTML = '';
     
-    // 1階から「クリア済み最高階層」までを選べる
     for (let i = 1; i <= Math.max(1, maxClearedFloor); i++) {
         const opt = document.createElement('option');
         opt.value = i; opt.textContent = `${i} 階`;
         select.appendChild(opt);
     }
-    // 未クリアの階も追加（常に最新の階に挑戦できるように）
     const nextOpt = document.createElement('option');
     nextOpt.value = Math.max(1, maxClearedFloor + 1);
     nextOpt.textContent = `${nextOpt.value} 階 (最新)`;
@@ -282,18 +279,19 @@ function setupBattle() {
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: '仲間' }));
+    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: '仲間', state: null }));
     enemyParty = [];
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
         const imgName = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
-        const mult = isBoss ? 3 : 1; // ドラゴン(ボス)のパラメーター3倍
+        const mult = isBoss ? 3 : 1; 
         enemyParty.push({ 
             id: Math.random(), 
             image: imgName, 
             name: imgName.replace('.png', ''), 
             params: { power: enemyLv * mult, speed: enemyLv * mult, hp: enemyLv * mult, intel: 0 }, 
-            curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss 
+            curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss,
+            state: null, trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)]
         });
     }
     battleActive = true; renderBattleUnits(); runTurn();
@@ -305,10 +303,17 @@ async function runTurn() {
         for (let u of actors) {
             if (u.curHp <= 0 || !battleActive) continue;
             
-            // 倍速モードに対応した待機時間
             await new Promise(r => setTimeout(r, 800 / battleSpeed));
             
+            // 状態異常判定（行動前）
+            if (u.state === '眠り') {
+                if (Math.random() < 0.7) { u.state = null; addLog(`${u.name}は目が覚めた`); }
+                else { addLog(`${u.name}は眠っている...`); continue; }
+            }
+            if (u.state === 'マヒ' && Math.random() < 0.2) { addLog(`${u.name}は痺れて動けない！`); continue; }
+
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
+            if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
             let target = targets[Math.floor(Math.random() * targets.length)];
             
@@ -317,7 +322,6 @@ async function runTurn() {
             } else {
                 let dmg = u.params.power;
                 
-                // クリティカル判定（知力 = 発生率%）
                 let isCrit = Math.random() * 100 < (u.params.intel || 0);
                 if (isCrit) {
                     dmg *= 2;
@@ -328,7 +332,17 @@ async function runTurn() {
 
                 target.curHp -= dmg;
                 addLog(`${target.name}に${dmg}ダメ`);
-                if(window.playHitAnimation) window.playHitAnimation();
+                
+                if(window.playBattleAnimation) window.playBattleAnimation(u, target);
+
+                // 状態異常判定（攻撃後付与）
+                if (u.trait && !target.isBoss) {
+                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}に毒ダメージ！`); }
+                    if (u.trait === 'マヒ' && !target.state) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
+                    if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
+                    if (u.trait === '混乱' && !target.state) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                }
+                if (target.state === '眠り' && Math.random() < 0.7) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
             }
             renderBattleUnits();
             if (checkEnd()) return;
@@ -340,7 +354,6 @@ function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
         battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
         
-        // クリア階層を記録
         if (currentFloor > maxClearedFloor) {
             maxClearedFloor = currentFloor;
             localStorage.setItem('dot_max_cleared', maxClearedFloor);
@@ -362,17 +375,32 @@ function renderBattleUnits() {
     [...playerParty, ...enemyParty].forEach((u, i) => {
         if (u.curHp <= 0) return;
         const div = document.createElement('div');
+        div.id = 'unit-' + String(u.id).replace('.','');
         div.style = `position:absolute; left:${u.side=='p'?'25%':'75%'}; top:${30 + (i%3)*20}%; text-align:center; transform:translate(-50%,-50%);`;
         div.innerHTML = `
             <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black; margin-bottom:2px;">${u.name}</div>
             <div style="width:40px; height:4px; background:red; margin:auto; border:1px solid #000;">
                 <div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div>
             </div>
+            <div style="color:yellow; font-size:10px; text-shadow:1px 1px 1px black; height:12px; margin-top:2px;">${u.state || ''}</div>
             <img src="${u.image}" style="width:80px; image-rendering:pixelated; ${u.side=='e'?'transform: scaleX(-1);':''}">
         `;
         layer.appendChild(div);
     });
 }
+
+// 戦闘アニメーション関数
+window.playBattleAnimation = (attacker, target) => {
+    const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
+    const tgtEl = document.getElementById('unit-' + String(target.id).replace('.',''));
+    if (atkEl) {
+        atkEl.classList.remove('anim-attack'); void atkEl.offsetWidth; atkEl.classList.add('anim-attack');
+    }
+    if (tgtEl) {
+        const dmgClass = target.side === 'p' ? 'anim-damage-p' : 'anim-damage-e';
+        tgtEl.classList.remove('anim-damage-p', 'anim-damage-e'); void tgtEl.offsetWidth; tgtEl.classList.add(dmgClass);
+    }
+};
 
 // --- オーディオ設定 ---
 window.gameAudio = {
@@ -402,8 +430,3 @@ function updateGameMusic() {
 document.addEventListener('click', () => {
     updateGameMusic();
 }, { once: false });
-
-window.playHitAnimation = () => {
-    const el = document.getElementById('battle-area');
-    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-};
