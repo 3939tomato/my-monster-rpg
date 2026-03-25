@@ -299,7 +299,7 @@ async function runTurn() {
             // --- 特殊行動: ドラゴンの全体攻撃 (25%) ---
             if (u.isBoss && Math.random() < 0.25) {
                 addLog(`<b style="color:red;">ドラゴンの全体攻撃！</b>`);
-                playBattleAnimation(u, null); // 全体攻撃用アニメ
+                playBattleAnimation(u, null); 
                 for (let target of targets) {
                     let dmg = Math.floor(u.params.power * 0.7);
                     target.curHp -= dmg;
@@ -321,6 +321,8 @@ async function runTurn() {
 
                     target.curHp -= dmg;
                     addLog(`${target.name}に${dmg}ダメ`);
+                    
+                    // アニメーション実行
                     playBattleAnimation(u, target);
 
                     if (u.trait && !target.isBoss) {
@@ -358,14 +360,13 @@ function renderBattleUnits() {
     [...playerParty, ...enemyParty].forEach((u) => {
         if (u.curHp <= 0) return;
         
-        // 重なり防止のための配置計算
+        // 重なり防止の配置
         const idx = (u.side === 'p') ? playerParty.indexOf(u) : enemyParty.indexOf(u);
         const topPos = (u.side === 'p') ? (35 + idx * 22) : (30 + idx * 25);
         const leftPos = (u.side === 'p') ? (25 - (idx % 2) * 5) : (75 + (idx % 2) * 5);
 
         const div = document.createElement('div');
         div.id = 'unit-' + String(u.id).replace('.','');
-        div.className = 'unit-container';
         div.style = `position:absolute; left:${leftPos}%; top:${topPos}%; text-align:center; transform:translate(-50%,-50%); transition: transform 0.1s;`;
         div.innerHTML = `
             <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black;">${u.name}</div>
@@ -384,7 +385,7 @@ function playBattleAnimation(attacker, target) {
         const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
         if (atkEl) {
             atkEl.classList.remove('anim-attack');
-            void atkEl.offsetWidth; // リフローしてアニメーションを再トリガー
+            void atkEl.offsetWidth; // 強制リフロー
             atkEl.classList.add('anim-attack');
         }
     }
