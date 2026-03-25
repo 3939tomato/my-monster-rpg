@@ -127,7 +127,7 @@ document.getElementById('btn-save-monster').onclick = () => {
         if (m) { m.image = dataUrl; m.size = currentGridSize; }
     } else {
         if (monsters.length >= MAX_MONSTERS) return alert("上限です");
-        monsters.push({ id: Date.now(), image: dataUrl, size: currentGridSize, level: 1, points: 1, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
+        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 1, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
     }
     saveAndRefresh();
     spawnMonstersInField();
@@ -149,7 +149,10 @@ function renderMonsterList() {
             <div class="item-main">
                 <input type="checkbox" ${m.inParty?'checked':''} onchange="toggleParty(${m.id})" style="width:20px; height:20px;">
                 <img src="${m.image}" style="width:60px; height:60px; image-rendering:pixelated;">
-                <div style="flex:1"><strong>No.${i+1} (Lv.${m.level})</strong><br>残り: <b style="color:red;">${m.points}pt</b></div>
+                <div style="flex:1">
+                    <input type="text" class="name-input" value="${m.name || 'ななし'}" onchange="updateMonsterName(${m.id}, this.value)">
+                    <br><small>Lv.${m.level} / 残り: <b style="color:red;">${m.points}pt</b></small>
+                </div>
                 <button onclick="editMonster(${m.id})">描く</button>
                 <button onclick="deleteMonster(${m.id})" style="background:#ff6b6b; color:white;">別れ</button>
             </div>
@@ -168,6 +171,11 @@ function renderMonsterList() {
         `;
         listCont.appendChild(item);
     });
+}
+
+function updateMonsterName(id, val) {
+    const m = monsters.find(m => m.id === id);
+    if (m) { m.name = val; saveAndRefresh(); }
 }
 
 function toggleParty(id) {
@@ -255,7 +263,7 @@ function setupBattle() {
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: '仲間', state: null }));
+    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: m.name || '仲間', state: null }));
     enemyParty = [];
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
@@ -278,7 +286,6 @@ async function runTurn() {
             if (u.curHp <= 0 || !battleActive) continue;
             await new Promise(r => setTimeout(r, 800 / battleSpeed));
             
-            // 行動不能系判定
             if (u.state === '眠り') {
                 if (Math.random() < 0.3) { u.state = null; addLog(`${u.name}は目が覚めた`); }
                 else { addLog(`${u.name}は眠っている...`); continue; }
@@ -288,31 +295,42 @@ async function runTurn() {
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
             if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
-            let target = targets[Math.floor(Math.random() * targets.length)];
-            
-            // 回避判定：ターゲットの「速」の値がそのまま回避率(%)
-            if (u.side === 'e' && Math.random() * 100 < target.params.speed) {
-                addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
-            } else {
-                let dmg = u.params.power;
-                let isCrit = Math.random() * 100 < (u.params.intel || 0);
-                if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
-                else { addLog(`${u.name}の攻撃！`); }
 
-                target.curHp -= dmg;
-                addLog(`${target.name}に${dmg}ダメ`);
-                
-                // アニメーション実行
-                playBattleAnimation(u, target);
-
-                // 状態付与・特殊効果
-                if (u.trait && !target.isBoss) {
-                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
-                    if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
-                    if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
-                    if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+            // --- 特殊行動: ドラゴンの全体攻撃 (25%) ---
+            if (u.isBoss && Math.random() < 0.25) {
+                addLog(`<b style="color:red;">ドラゴンの全体攻撃！</b>`);
+                playBattleAnimation(u, null); // 全体攻撃用アニメ
+                for (let target of targets) {
+                    let dmg = Math.floor(u.params.power * 0.7);
+                    target.curHp -= dmg;
+                    addLog(`${target.name}に${dmg}ダメ`);
+                    playBattleAnimation(null, target); 
                 }
-                if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+            } else {
+                let target = targets[Math.floor(Math.random() * targets.length)];
+                
+                // 回避計算: (防御側の速さ - 攻撃側の速さ)
+                let evadeProb = Math.max(0, target.params.speed - u.params.speed);
+                if (Math.random() * 100 < evadeProb) {
+                    addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
+                } else {
+                    let dmg = u.params.power;
+                    let isCrit = Math.random() * 100 < (u.params.intel || 0);
+                    if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
+                    else { addLog(`${u.name}の攻撃！`); }
+
+                    target.curHp -= dmg;
+                    addLog(`${target.name}に${dmg}ダメ`);
+                    playBattleAnimation(u, target);
+
+                    if (u.trait && !target.isBoss) {
+                        if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                        if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
+                        if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
+                        if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                    }
+                    if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+                }
             }
             renderBattleUnits();
             if (checkEnd()) return;
@@ -339,9 +357,16 @@ function renderBattleUnits() {
     const layer = document.getElementById('battle-unit-layer'); layer.innerHTML = '';
     [...playerParty, ...enemyParty].forEach((u) => {
         if (u.curHp <= 0) return;
+        
+        // 重なり防止のための配置計算
+        const idx = (u.side === 'p') ? playerParty.indexOf(u) : enemyParty.indexOf(u);
+        const topPos = (u.side === 'p') ? (35 + idx * 22) : (30 + idx * 25);
+        const leftPos = (u.side === 'p') ? (25 - (idx % 2) * 5) : (75 + (idx % 2) * 5);
+
         const div = document.createElement('div');
         div.id = 'unit-' + String(u.id).replace('.','');
-        div.style = `position:absolute; left:${u.side=='p'?'25%':'75%'}; top:${u.side=='p'?'50%':'40%'}; text-align:center; transform:translate(-50%,-50%); transition: transform 0.1s;`;
+        div.className = 'unit-container';
+        div.style = `position:absolute; left:${leftPos}%; top:${topPos}%; text-align:center; transform:translate(-50%,-50%); transition: transform 0.1s;`;
         div.innerHTML = `
             <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black;">${u.name}</div>
             <div style="width:50px; height:5px; background:red; margin:5px auto; border:1px solid #000; position:relative;">
@@ -355,20 +380,23 @@ function renderBattleUnits() {
 }
 
 function playBattleAnimation(attacker, target) {
-    const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
-    const tgtEl = document.getElementById('unit-' + String(target.id).replace('.',''));
-    
-    if (atkEl) {
-        atkEl.classList.remove('anim-attack');
-        void atkEl.offsetWidth; // リフロー
-        atkEl.classList.add('anim-attack');
+    if (attacker) {
+        const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
+        if (atkEl) {
+            atkEl.classList.remove('anim-attack');
+            void atkEl.offsetWidth; // リフローしてアニメーションを再トリガー
+            atkEl.classList.add('anim-attack');
+        }
     }
     
-    if (tgtEl) {
-        const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
-        tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
-        void tgtEl.offsetWidth; // リフロー
-        tgtEl.classList.add(kbClass);
+    if (target) {
+        const tgtEl = document.getElementById('unit-' + String(target.id).replace('.',''));
+        if (tgtEl) {
+            const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
+            tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
+            void tgtEl.offsetWidth;
+            tgtEl.classList.add(kbClass);
+        }
     }
 }
 
