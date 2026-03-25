@@ -13,23 +13,23 @@
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
 
-        /* --- アニメーション設定（元の位置 -50%,-50% に必ず戻る設定） --- */
+        /* --- アニメーション設定（元の位置 -50%,-50% に必ず戻る） --- */
         .anim-attack { animation: attack-jump 0.3s ease-out; }
         @keyframes attack-jump {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(-50%, calc(-50% - 40px)); } /* 上に跳ねる */
+            50% { transform: translate(-50%, calc(-50% - 40px)); }
         }
 
         .anim-damage-p { animation: damage-kb-p 0.3s ease-out; }
         @keyframes damage-kb-p {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% - 30px), -50%); } /* 左にノックバック */
+            50% { transform: translate(calc(-50% - 30px), -50%); }
         }
 
         .anim-damage-e { animation: damage-kb-e 0.3s ease-out; }
         @keyframes damage-kb-e {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% + 30px), -50%); } /* 右にノックバック */
+            50% { transform: translate(calc(-50% + 30px), -50%); }
         }
 
         /* --- エディタ --- */
