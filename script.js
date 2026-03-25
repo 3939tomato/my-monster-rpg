@@ -1,6 +1,11 @@
 let monsters = [];
 let editingMonsterId = null;
-const MAX_MONSTERS = 3;
+const MAX_MONSTERS = 5; 
+const MAX_PARTY = 3;    
+
+// 敵画像
+const ENEMY_IMAGES = ['スケルトン.png', 'ゾンビ.png', 'ブルースライム.png', 'レッドスライム.png'];
+const BOSS_IMAGE = 'ドラゴン.png';
 
 const canvas = document.getElementById('paintCanvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -11,8 +16,6 @@ const gridSizeSelect = document.getElementById('gridSize');
 let currentGridSize = 32;
 let currentTool = 'pen';
 let isDrawing = false;
-let isPanning = false;
-
 let viewState = { scale: 10, pointX: 0, pointY: 0, startX: 0, startY: 0, panning: false };
 
 window.onload = () => {
@@ -31,25 +34,14 @@ function initCanvas() {
     canvas.width = currentGridSize;
     canvas.height = currentGridSize;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-function clearCanvas() {
-    if(confirm("すべて消去しますか？")) ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 function updateTransform() {
     canvas.style.transform = `translate(${viewState.pointX}px, ${viewState.pointY}px) scale(${viewState.scale})`;
-    statusDisplay.textContent = `Grid: ${currentGridSize}x${currentGridSize} | Zoom: ${Math.round(viewState.scale * 10)}%`;
+    statusDisplay.textContent = `Size: ${currentGridSize}x${currentGridSize} | Zoom: ${Math.round(viewState.scale * 10)}%`;
 }
 
 function zoom(factor) {
-    const cx = container.clientWidth / 2;
-    const cy = container.clientHeight / 2;
-    const dx = cx - viewState.pointX;
-    const dy = cy - viewState.pointY;
-    viewState.pointX = cx - dx * factor;
-    viewState.pointY = cy - dy * factor;
     viewState.scale = Math.max(1, Math.min(viewState.scale * factor, 80));
     updateTransform();
 }
@@ -62,89 +54,55 @@ function resetView() {
 }
 
 gridSizeSelect.onchange = () => {
-    if(confirm("サイズを変更すると現在の絵が消えます。よろしいですか？")) {
+    if(confirm("絵が消えますがよろしいですか？")) {
         currentGridSize = parseInt(gridSizeSelect.value);
         initCanvas();
         resetView();
-    } else {
-        gridSizeSelect.value = currentGridSize;
     }
 };
 
-function getGridPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) / viewState.scale;
-    const y = (clientY - rect.top) / viewState.scale;
-    return { x: Math.floor(x), y: Math.floor(y) };
-}
-
 function setupCanvasEvents() {
     container.onpointerdown = (e) => {
-        if (isPanning || e.button === 1) {
-            viewState.panning = true;
-            viewState.startX = e.clientX - viewState.pointX;
-            viewState.startY = e.clientY - viewState.pointY;
-            return;
-        }
-        isDrawing = true;
-        execTool(e);
+        if (e.button === 1 || e.shiftKey) { viewState.panning = true; viewState.startX = e.clientX - viewState.pointX; viewState.startY = e.clientY - viewState.pointY; return; }
+        isDrawing = true; execTool(e);
     };
     window.onpointermove = (e) => {
-        if (viewState.panning) {
-            viewState.pointX = e.clientX - viewState.startX;
-            viewState.pointY = e.clientY - viewState.startY;
-            updateTransform();
-        } else if (isDrawing) {
-            execTool(e);
-        }
+        if (viewState.panning) { viewState.pointX = e.clientX - viewState.startX; viewState.pointY = e.clientY - viewState.startY; updateTransform(); }
+        else if (isDrawing) execTool(e);
     };
     window.onpointerup = () => { isDrawing = false; viewState.panning = false; };
-    container.onwheel = (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 0.9 : 1.1); };
-    window.onkeydown = (e) => { if (e.code === 'Space') isPanning = true; };
-    window.onkeyup = (e) => { if (e.code === 'Space') isPanning = false; };
 }
 
 function execTool(e) {
-    const pos = getGridPos(e);
-    if (pos.x < 0 || pos.x >= currentGridSize || pos.y < 0 || pos.y >= currentGridSize) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / viewState.scale);
+    const y = Math.floor((e.clientY - rect.top) / viewState.scale);
+    if (x < 0 || x >= currentGridSize || y < 0 || y >= currentGridSize) return;
+
     const color = document.getElementById('colorPicker').value;
     const size = parseInt(document.getElementById('penSize').value);
     
     if (currentTool === 'pen') {
-        ctx.fillStyle = color;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillRect(pos.x - Math.floor(size/2), pos.y - Math.floor(size/2), size, size);
+        ctx.fillStyle = color; ctx.globalCompositeOperation = 'source-over';
+        ctx.fillRect(x - Math.floor(size/2), y - Math.floor(size/2), size, size);
     } else if (currentTool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillRect(pos.x - Math.floor(size/2), pos.y - Math.floor(size/2), size, size);
+        ctx.fillRect(x - Math.floor(size/2), y - Math.floor(size/2), size, size);
     } else if (currentTool === 'bucket' && e.type === 'pointerdown') {
-        floodFill(pos.x, pos.y, color);
-    } else if (currentTool === 'picker' && e.type === 'pointerdown') {
-        const d = ctx.getImageData(pos.x, pos.y, 1, 1).data;
-        if (d[3] > 0) {
-            document.getElementById('colorPicker').value = "#" + ((1 << 24) + (d[0] << 16) + (d[1] << 8) + d[2]).toString(16).slice(1);
-            setTool('pen');
-        }
+        floodFill(x, y, color);
     }
-}
-
-function setTool(tool) {
-    currentTool = tool;
-    document.querySelectorAll('#tool-panel button').forEach(b => b.classList.remove('active'));
-    document.getElementById('tool-' + tool).classList.add('active');
 }
 
 function floodFill(startX, startY, fillColor) {
     const img = ctx.getImageData(0, 0, currentGridSize, currentGridSize);
     const target = getPixel(img, startX, startY);
     const rgb = hexToRgb(fillColor);
-    if (colorsMatch(target, [...rgb, 255])) return;
+    if (target[0] === rgb[0] && target[1] === rgb[1] && target[2] === rgb[2] && target[3] === 255) return;
     const stack = [[startX, startY]];
     while (stack.length > 0) {
         const [x, y] = stack.pop();
-        if (colorsMatch(getPixel(img, x, y), target)) {
+        const cur = getPixel(img, x, y);
+        if (cur[0]===target[0] && cur[1]===target[1] && cur[2]===target[2] && cur[3]===target[3]) {
             setPixel(img, x, y, rgb);
             if (x > 0) stack.push([x - 1, y]);
             if (x < currentGridSize - 1) stack.push([x + 1, y]);
@@ -154,311 +112,148 @@ function floodFill(startX, startY, fillColor) {
     }
     ctx.putImageData(img, 0, 0);
 }
+function getPixel(img, x, y) { const i = (y * img.width + x) * 4; return [img.data[i], img.data[i+1], img.data[i+2], img.data[i+3]]; }
+function setPixel(img, x, y, rgb) { const i = (y * img.width + x) * 4; img.data[i]=rgb[0]; img.data[i+1]=rgb[1]; img.data[i+2]=rgb[2]; img.data[i+3]=255; }
+function hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]; }
 
-function getPixel(img, x, y) {
-    const i = (y * img.width + x) * 4;
-    return [img.data[i], img.data[i+1], img.data[i+2], img.data[i+3]];
-}
-function setPixel(img, x, y, rgb) {
-    const i = (y * img.width + x) * 4;
-    img.data[i]=rgb[0]; img.data[i+1]=rgb[1]; img.data[i+2]=rgb[2]; img.data[i+3]=255;
-}
-function colorsMatch(a, b) { return a[0]===b[0] && a[1]===b[1] && a[2]===b[2] && a[3]===b[3]; }
-function hexToRgb(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return [r, g, b];
-}
+function setTool(t) { currentTool = t; document.querySelectorAll('#tool-panel button').forEach(b => b.classList.remove('active')); document.getElementById('tool-'+t).classList.add('active'); }
+function clearCanvas() { if(confirm("消去しますか？")) ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
 document.getElementById('btn-save-monster').onclick = () => {
     const dataUrl = canvas.toDataURL();
     if (editingMonsterId !== null) {
-        const i = monsters.findIndex(m => m.id === editingMonsterId);
-        if (i !== -1) {
-            monsters[i].image = dataUrl;
-            monsters[i].size = currentGridSize;
-        }
+        const m = monsters.find(m => m.id === editingMonsterId);
+        if (m) { m.image = dataUrl; m.size = currentGridSize; }
     } else {
-        if (monsters.length >= MAX_MONSTERS) {
-            alert(`最大${MAX_MONSTERS}体までです。`);
-            return;
-        }
-        monsters.push({
-            id: Date.now(),
-            image: dataUrl,
-            size: currentGridSize,
-            level: 1,
-            points: 1,
-            params: { power: 1, speed: 1, hp: 1, intel: 1 },
-            trait: null
-        });
+        if (monsters.length >= MAX_MONSTERS) return alert("上限です");
+        monsters.push({ id: Date.now(), image: dataUrl, size: currentGridSize, level: 1, points: 1, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
     }
-    
-    localStorage.setItem('dot_monsters', JSON.stringify(monsters));
-    editingMonsterId = null;
-    spawnMonstersInField();
+    saveAndRefresh();
     goToField();
-    openBookModal();
 };
 
 function renderMonsterList() {
     const listCont = document.getElementById('monster-list');
-    if (!listCont) return;
-    
     listCont.innerHTML = '';
     document.getElementById('monster-count').textContent = `(${monsters.length}/${MAX_MONSTERS})`;
     document.getElementById('create-new-area').style.display = monsters.length >= MAX_MONSTERS ? 'none' : 'block';
 
     monsters.forEach((m, i) => {
-        if (!m.params) {
-            m.level = 1; m.points = 1; m.trait = null;
-            m.params = { power: 1, speed: 1, hp: 1, intel: 1 };
-        }
-
         const item = document.createElement('div');
         item.className = 'book-item';
-        item.style.flexDirection = 'column';
-        item.style.alignItems = 'flex-start';
+        if (m.inParty) item.style.borderColor = '#4a90e2';
 
         item.innerHTML = `
-            <div style="display:flex; width:100%; gap:15px; align-items:center;">
-                <img src="${m.image}" style="width:64px; height:64px; border:1px solid #ccc;">
-                <div class="item-info">
-                    <strong>仲間 No.${i+1} (Lv.${m.level})</strong><br>
-                    残りポイント: <b style="color:red; font-size:1.2em;">${m.points}</b>
-                </div>
-                <div class="item-actions">
-                    <button class="btn-edit" onclick="editMonster(${m.id})">描く</button>
-                    <button class="btn-delete" onclick="deleteMonster(${m.id})">別れ</button>
-                </div>
+            <div class="item-main">
+                <input type="checkbox" ${m.inParty?'checked':''} onchange="toggleParty(${m.id})" style="width:20px; height:20px;">
+                <img src="${m.image}" style="width:60px; height:60px; image-rendering:pixelated;">
+                <div style="flex:1"><strong>No.${i+1} (Lv.${m.level})</strong><br>残り: <b style="color:red;">${m.points}pt</b></div>
+                <button onclick="editMonster(${m.id})">描く</button>
+                <button onclick="deleteMonster(${m.id})" style="background:#ff6b6b; color:white;">別れ</button>
             </div>
-            
-            <div style="width:100%; margin-top:10px; background:#f0f0f0; padding:10px; font-size:13px;">
-                <div>パワー(攻): ${m.params.power} <button onclick="addParam(${m.id}, 'power')">＋</button></div>
-                <div>スピード(速/避): ${m.params.speed} <button onclick="addParam(${m.id}, 'speed')">＋</button></div>
-                <div>体力(HP/回復): ${m.params.hp} <button onclick="addParam(${m.id}, 'hp')">＋</button></div>
-                <div>知能: ${m.params.intel} <button onclick="addParam(${m.id}, 'intel')">＋</button></div>
-                <div style="margin-top:5px; border-top:1px solid #ccc; pt:5px;">
-                    特性(5pt): 
-                    <select onchange="changeTrait(${m.id}, this.value)">
-                        <option value="">なし</option>
-                        <option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
-                        <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option>
-                        <option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
-                        <option value="混乱" ${m.trait==='混乱'?'selected':''}>混乱</option>
-                    </select>
-                </div>
+            <div style="margin-top:10px; font-size:12px; background:#eee; padding:5px;">
+                攻: ${m.params.power} <button onclick="addParam(${m.id},'power')">＋</button> | 
+                速: ${m.params.speed} <button onclick="addParam(${m.id},'speed')">＋</button> | 
+                体: ${m.params.hp} <button onclick="addParam(${m.id},'hp')">＋</button> | 
+                知: ${m.params.intel} <button onclick="addParam(${m.id},'intel')">＋</button>
+                <div style="margin-top:5px;">特性: <select onchange="changeTrait(${m.id},this.value)">
+                    <option value="">なし</option><option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
+                    <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option><option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
+                </select>
+                <button onclick="resetParams(${m.id})" style="float:right; font-size:10px;">振り直し</button></div>
             </div>
         `;
         listCont.appendChild(item);
     });
 }
 
-function addParam(id, key) {
+function toggleParty(id) {
     const m = monsters.find(m => m.id === id);
-    if (m && m.points > 0) {
-        m.params[key]++;
-        m.points--;
-        saveAndRefresh();
-        // ★ポイントを振った時のSEを鳴らす
-        if(window.gameAudio) {
-            window.gameAudio.sePoint.currentTime = 0;
-            window.gameAudio.sePoint.play().catch(()=>{});
-        }
-    }
+    if (!m.inParty && monsters.filter(mon => mon.inParty).length >= MAX_PARTY) { alert("3体までです"); renderMonsterList(); return; }
+    m.inParty = !m.inParty; saveAndRefresh();
 }
 
-function changeTrait(id, val) {
+function addParam(id, k) {
     const m = monsters.find(m => m.id === id);
-    if (!m) return;
-    if (val === "") { m.trait = null; saveAndRefresh(); return; }
-    if (m.trait === val) return;
-    if (m.points >= 5) {
-        m.trait = val;
-        m.points -= 5;
-        saveAndRefresh();
-    } else {
-        alert("ポイントが5足りません");
-        renderMonsterList();
-    }
+    if (m && m.points > 0) { m.params[k]++; m.points--; if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); } saveAndRefresh(); }
 }
 
-function saveAndRefresh() {
-    localStorage.setItem('dot_monsters', JSON.stringify(monsters));
-    renderMonsterList();
-}
-
-function editMonster(id) {
+function resetParams(id) {
     const m = monsters.find(m => m.id === id);
-    editingMonsterId = id;
-    currentGridSize = m.size;
-    gridSizeSelect.value = currentGridSize;
-    initCanvas();
-    const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0);
-    img.src = m.image;
-    closeBookModal();
-    goToEditor();
-    setTimeout(resetView, 100);
+    if (m && confirm("リセットしますか？")) { m.points = m.level; m.params = { power: 1, speed: 1, hp: 1, intel: 1 }; m.trait = null; saveAndRefresh(); }
 }
 
-function createNewMonster() {
-    editingMonsterId = null;
-    currentGridSize = 32;
-    gridSizeSelect.value = 32;
-    initCanvas();
-    closeBookModal();
-    goToEditor();
-    setTimeout(resetView, 100);
+function changeTrait(id, v) {
+    const m = monsters.find(m => m.id === id);
+    if (v === "") { m.trait = null; } else if (m.points >= 5) { m.trait = v; m.points -= 5; } else { alert("5pt必要です"); }
+    saveAndRefresh();
 }
 
-function deleteMonster(id) {
-    if(!confirm("削除しますか？")) return;
-    monsters = monsters.filter(m => m.id !== id);
-    localStorage.setItem('dot_monsters', JSON.stringify(monsters));
-    renderMonsterList();
-    spawnMonstersInField();
-}
-
-function goToField() { document.getElementById('editor-view').style.display = 'none'; document.getElementById('field-view').style.display = 'block'; }
-function goToEditor() { document.getElementById('field-view').style.display = 'none'; document.getElementById('editor-view').style.display = 'flex'; }
-function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display = 'flex'; }
-function closeBookModal() { document.getElementById('book-modal').style.display = 'none'; }
+function deleteMonster(id) { if(confirm("削除しますか？")) { monsters = monsters.filter(m => m.id !== id); saveAndRefresh(); spawnMonstersInField(); } }
+function saveAndRefresh() { localStorage.setItem('dot_monsters', JSON.stringify(monsters)); renderMonsterList(); }
+function editMonster(id) { editingMonsterId = id; const m = monsters.find(m => m.id === id); currentGridSize = m.size; initCanvas(); const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = m.image; closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
+function createNewMonster() { editingMonsterId = null; initCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height); closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
+function goToField() { document.getElementById('editor-view').style.display='none'; document.getElementById('field-view').style.display='block'; }
+function goToEditor() { document.getElementById('field-view').style.display='none'; document.getElementById('editor-view').style.display='flex'; }
+function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display='flex'; }
+function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
 
 function spawnMonstersInField() {
-    const area = document.getElementById('monster-field-area');
-    area.innerHTML = '';
+    const area = document.getElementById('monster-field-area'); area.innerHTML = '';
     monsters.forEach(m => {
-        const img = document.createElement('img');
-        img.src = m.image;
-        img.className = 'monster';
-        img.style.left = (20 + Math.random() * 60) + '%';
-        img.style.top = (30 + Math.random() * 50) + '%';
-        img.style.width = (m.size * 3) + 'px';
-        area.appendChild(img);
-        animateMonster(img);
+        const img = document.createElement('img'); img.src = m.image; img.className = 'monster';
+        img.style.left = (20 + Math.random() * 60) + '%'; img.style.top = (30 + Math.random() * 50) + '%';
+        img.style.width = (m.size * 2) + 'px'; area.appendChild(img); animateMonster(img);
     });
 }
-
 function animateMonster(el) {
-    let baseL = parseFloat(el.style.left);
-    let baseT = parseFloat(el.style.top);
     let a = Math.random() * Math.PI * 2;
-    function step() {
-        if(!document.body.contains(el)) return;
-        a += 0.01;
-        const x = baseL + Math.cos(a) * 2;
-        const y = baseT + Math.sin(a * 0.5) * 2;
-        const jump = Math.abs(Math.sin(Date.now() / 200)) * 15;
-        el.style.left = x + '%';
-        el.style.top = y + '%';
-        el.style.transform = `translate(-50%, calc(-50% - ${jump}px))`;
-        requestAnimationFrame(step);
-    }
+    function step() { if(!document.body.contains(el)) return; a += 0.02; el.style.transform = `translate(-50%, calc(-50% - ${Math.abs(Math.sin(a))*10}px))`; requestAnimationFrame(step); }
     requestAnimationFrame(step);
 }
 
-// --- バトル・ダンジョン システム ---
-let currentFloor = 1;
-let battleActive = false;
-let playerParty = [];
-let enemyParty = [];
-
-if (!document.getElementById('battle-screen')) {
-    const bScr = document.createElement('div');
-    bScr.id = 'battle-screen';
-    bScr.style = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#222; z-index:2000; color:white; font-family:monospace;";
-    bScr.innerHTML = `
-        <div id="floor-indicator" style="text-align:center; padding:10px; background:#444;">1階</div>
-        <div id="battle-area" style="height:50%; position:relative; overflow:hidden; background:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhGPABPzAZWIIOIIj8Ad8LBAX4SYXUAAAAAElFTkSuQmCC');"></div>
-        <div id="battle-log" style="height:30%; overflow-y:scroll; background:#000; padding:10px; font-size:12px; border-top:2px solid #666;"></div>
-        <div style="height:10%; display:flex; justify-content:center; align-items:center; gap:20px;">
-            <button id="btn-next-floor" style="display:none; background:green; color:white; padding:10px;" onclick="nextFloor()">次の階へ</button>
-            <button style="background:#666; color:white; padding:10px;" onclick="exitDungeon()">撤退</button>
-        </div>
-    `;
-    document.body.appendChild(bScr);
-    
-    const field = document.getElementById('field-view');
-    const dBtn = document.createElement('button');
-    dBtn.innerHTML = "⚔️ ダンジョンへ";
-    dBtn.style = "position:absolute; bottom:20px; left:20px; z-index:100; background:maroon; color:white; padding:15px; border-radius:10px;";
-    dBtn.onclick = startDungeon;
-    field.appendChild(dBtn);
-}
+// --- バトルシステム ---
+let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
 
 function startDungeon() {
-    if (monsters.length === 0) return alert("仲間がいません");
-    currentFloor = 1;
-    document.getElementById('battle-screen').style.display = 'block';
-    setupBattle();
+    const party = monsters.filter(m => m.inParty);
+    if (party.length === 0) return alert("パーティを選んでください（最大3体）");
+    currentFloor = 1; document.getElementById('battle-screen').style.display = 'block'; setupBattle();
 }
 
 function setupBattle() {
     const isBoss = (currentFloor % 10 === 0);
     const enemyLv = isBoss ? Math.floor(currentFloor * 1.5) : currentFloor;
-    const enemyCount = isBoss ? 1 : 3;
-
     document.getElementById('floor-indicator').textContent = `${currentFloor}階 ${isBoss ? '[BOSS]' : ''}`;
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', state: null }));
+    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p' }));
     enemyParty = [];
-    for (let i = 0; i < enemyCount; i++) {
-        const elv = enemyLv;
-        const ep = { power: elv, speed: elv, hp: elv, intel: elv };
-        enemyParty.push({
-            id: Math.random(), image: '', params: ep, level: elv,
-            curHp: ep.hp * 10, maxHp: ep.hp * 10, side: 'e', state: null,
-            trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)],
-            isBoss: isBoss
-        });
+    const count = isBoss ? 1 : 3;
+    for (let i = 0; i < count; i++) {
+        const img = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
+        enemyParty.push({ id: Math.random(), image: img, params: { power: enemyLv, speed: enemyLv, hp: enemyLv }, curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss });
     }
-    battleActive = true;
-    renderBattleUnits();
-    runTurn();
+    battleActive = true; renderBattleUnits(); runTurn();
 }
 
 async function runTurn() {
     while (battleActive) {
-        let actors = [...playerParty, ...enemyParty].filter(u => u.curHp > 0);
-        actors.sort((a, b) => b.params.speed - a.params.speed);
-
+        let actors = [...playerParty, ...enemyParty].filter(u => u.curHp > 0).sort((a,b) => b.params.speed - a.params.speed);
         for (let u of actors) {
             if (u.curHp <= 0 || !battleActive) continue;
-            await new Promise(r => setTimeout(r, 600));
-
-            if (u.state === '眠り') {
-                if (Math.random() < 0.7) { u.state = null; addLog(`${u.side=='p'?'味方':'敵'}は目が覚めた`); }
-                else { addLog(`${u.side=='p'?'味方':'敵'}は眠っている...`); continue; }
-            }
-            if (u.state === 'マヒ' && Math.random() < 0.2) { addLog(`${u.side=='p'?'味方':'敵'}は痺れて動けない！`); continue; }
-
+            await new Promise(r => setTimeout(r, 800));
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
-            if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
-
             let target = targets[Math.floor(Math.random() * targets.length)];
             
             if (Math.random() * 100 < target.params.speed) {
                 addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ...回避された`);
             } else {
-                let dmg = u.params.power;
-                target.curHp -= dmg;
-                addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ${target.side=='p'?'味方':'敵'}に${dmg}ダメ`);
-                
-                // ★攻撃がヒットした時に画面を揺らす！
+                let dmg = u.params.power; target.curHp -= dmg;
+                addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ${dmg}ダメ`);
                 if(window.playHitAnimation) window.playHitAnimation();
-
-                if (u.trait && !target.isBoss) {
-                    if (u.trait === '毒') { target.curHp -= 2; addLog("毒ダメージ！"); }
-                    if (u.trait === 'マヒ') { target.state = 'マヒ'; addLog("マヒさせた！"); }
-                    if (u.trait === '眠り' && Math.random() < 0.2) { target.state = '眠り'; addLog("眠らせた！"); }
-                    if (u.trait === '混乱') { target.state = '混乱'; addLog("混乱させた！"); }
-                }
-                if (target.state === '眠り' && Math.random() < 0.7) { target.state = null; addLog("衝撃で目が覚めた！"); }
             }
             renderBattleUnits();
             if (checkEnd()) return;
@@ -468,18 +263,11 @@ async function runTurn() {
 
 function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
-        battleActive = false;
-        addLog("勝利！全員LvUP & 1pt獲得！");
-        monsters.forEach(m => { m.level++; m.points++; });
-        saveAndRefresh();
-        if (currentFloor < 15) document.getElementById('btn-next-floor').style.display = 'block';
-        return true;
+        battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
+        monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
+        saveAndRefresh(); document.getElementById('btn-next-floor').style.display = 'block'; return true;
     }
-    if (playerParty.every(p => p.curHp <= 0)) {
-        battleActive = false;
-        addLog("全滅しました...");
-        return true;
-    }
+    if (playerParty.every(p => p.curHp <= 0)) { battleActive = false; addLog("全滅..."); return true; }
     return false;
 }
 
@@ -488,85 +276,44 @@ function exitDungeon() { battleActive = false; document.getElementById('battle-s
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
 function renderBattleUnits() {
-    const area = document.getElementById('battle-area');
-    area.innerHTML = '';
+    const area = document.getElementById('battle-area'); area.innerHTML = '';
     [...playerParty, ...enemyParty].forEach((u, i) => {
         if (u.curHp <= 0) return;
         const div = document.createElement('div');
-        div.style = `position:absolute; transition:0.3s; left:${u.side=='p'?'20%':'70%'}; top:${20 + (i%3)*25}%; text-align:center;`;
+        div.style = `position:absolute; left:${u.side=='p'?'20%':'70%'}; top:${20 + (i%3)*25}%; text-align:center;`;
         div.innerHTML = `
             <div style="width:40px; height:4px; background:red; margin:auto;"><div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div></div>
-            <img src="${u.image}" style="width:50px; image-rendering:pixelated; ${u.side=='e'?'filter:hue-rotate(90deg)':''}">
-            <div style="font-size:10px;">${u.state || ''}</div>
+            <img src="${u.image}" style="width:50px; image-rendering:pixelated;">
         `;
         area.appendChild(div);
     });
 }
 
-/* --- 【完全統合版】BGM・SE・設定システム --- */
+// --- オーディオ設定 ---
 window.gameAudio = {
-    field: new Audio('so_sweet.mp3'),
-    battle: new Audio('Quick_pipes.mp3'),
-    boss: new Audio('Battle_in_the_Moonlight.mp3'),
-    sePoint: new Audio('point.mp3')
+    field: new Audio('so_sweet.mp3'), battle: new Audio('Quick_pipes.mp3'), boss: new Audio('Battle_in_the_Moonlight.mp3'), sePoint: new Audio('point.mp3')
 };
+let volBGM = 0.08, volSE = 0.5;
+const allBGM = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
+allBGM.forEach(s => { s.loop = true; s.volume = volBGM; });
 
-let volBGM = 0.08;
-let volSE = 0.5;
-
-const allBGMTracks = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
-allBGMTracks.forEach(s => { s.loop = true; s.volume = volBGM; });
-
-const btnSet = document.getElementById('settings-btn');
-const modalSet = document.getElementById('settings-modal');
-const btnClose = document.getElementById('settings-close');
-const sliBGM = document.getElementById('bgm-slider');
-const sliSE = document.getElementById('se-slider');
-
-if (btnSet) btnSet.onclick = () => { if(modalSet) modalSet.style.display = 'flex'; };
-if (btnClose) btnClose.onclick = () => { if(modalSet) modalSet.style.display = 'none'; };
-
-if (sliBGM) {
-    sliBGM.oninput = (e) => {
-        volBGM = e.target.value;
-        allBGMTracks.forEach(s => s.volume = volBGM);
-    };
-}
-if (sliSE) {
-    sliSE.oninput = (e) => {
-        volSE = e.target.value;
-        window.gameAudio.sePoint.volume = volSE;
-    };
-}
+document.getElementById('settings-btn').onclick = () => document.getElementById('settings-modal').style.display = 'flex';
+document.getElementById('bgm-slider').oninput = (e) => { volBGM = e.target.value; allBGM.forEach(s => s.volume = volBGM); };
+document.getElementById('se-slider').oninput = (e) => { volSE = e.target.value; window.gameAudio.sePoint.volume = volSE; };
 
 function updateGameMusic() {
-    allBGMTracks.forEach(s => s.pause());
-
-    const isEditor = document.getElementById('editor-view')?.style.display !== 'none';
-    const isBattle = document.getElementById('battle-screen')?.style.display !== 'none';
-    const isField = document.getElementById('field-view')?.style.display !== 'none';
-
-    if (isEditor) return; // お絵描き中は無音
-
-    if (isBattle) {
-        const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
-        if (isBoss) window.gameAudio.boss.play().catch(() => {});
-        else window.gameAudio.battle.play().catch(() => {});
-    } else if (isField) {
-        window.gameAudio.field.play().catch(() => {});
+    allBGM.forEach(s => s.pause());
+    if (document.getElementById('editor-view').style.display !== 'none') return;
+    if (document.getElementById('battle-screen').style.display !== 'none') {
+        if (currentFloor % 10 === 0) window.gameAudio.boss.play().catch(()=>{});
+        else window.gameAudio.battle.play().catch(()=>{});
+    } else {
+        window.gameAudio.field.play().catch(()=>{});
     }
 }
-
 document.addEventListener('click', () => setTimeout(updateGameMusic, 100));
 
-// 戦闘アニメーション関数（画面全体を揺らす）
-window.playHitAnimation = function() {
+window.playHitAnimation = () => {
     const el = document.getElementById('battle-area');
-    if (el) {
-        el.classList.remove('shake', 'hit-flash');
-        void el.offsetWidth;
-        el.classList.add('shake', 'hit-flash');
-    }
+    el.classList.remove('shake', 'hit-flash'); void el.offsetWidth; el.classList.add('shake', 'hit-flash');
 };
-
-console.log("全システム正常起動完了！");
