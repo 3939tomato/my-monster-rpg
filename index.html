@@ -17,19 +17,19 @@
         .anim-attack { animation: attack-jump 0.3s ease-out; }
         @keyframes attack-jump {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(-50%, calc(-50% - 40px)); }
+            50% { transform: translate(-50%, calc(-50% - 40px)); } /* 上に跳ねる */
         }
 
         .anim-damage-p { animation: damage-kb-p 0.3s ease-out; }
         @keyframes damage-kb-p {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% - 30px), -50%); }
+            50% { transform: translate(calc(-50% - 30px), -50%); } /* 左に弾かれる */
         }
 
         .anim-damage-e { animation: damage-kb-e 0.3s ease-out; }
         @keyframes damage-kb-e {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% + 30px), -50%); }
+            50% { transform: translate(calc(-50% + 30px), -50%); } /* 右に弾かれる */
         }
 
         /* --- エディタ --- */
@@ -145,8 +145,9 @@
         <div style="background:#333; color:white; padding:20px; border:3px solid #fff; border-radius:10px; text-align:center;">
             <h3>SETTINGS</h3>
             BGM: <input type="range" id="bgm-slider" min="0" max="1" step="0.01" value="0.08"><br><br>
-            SE: <input type="range" id="se-slider" min="0" max="1" step="0.01" value="0.5"><br><br>
-            <button onclick="document.getElementById('settings-modal').style.display='none'">閉じる</button>
+            SE: <input type="range" id="se-slider" min="0" max="1" step="0.01" value="0.5"><br><hr style="border:0.5px solid #555;">
+            <button onclick="resetData()" style="background: maroon; color: white; margin-bottom: 10px; width: 100%;">データ全消去</button><br>
+            <button onclick="document.getElementById('settings-modal').style.display='none'" style="width: 100%;">閉じる</button>
         </div>
     </div>
 
