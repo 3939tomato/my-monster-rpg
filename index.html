@@ -13,7 +13,7 @@
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
 
-        /* ダメージ演出（画面揺れ＆フラッシュ） */
+        /* ダメージ演出 */
         .shake { animation: shake-anim 0.3s; }
         .hit-flash { animation: flash-anim 0.2s; }
         @keyframes shake-anim {
@@ -21,138 +21,111 @@
             25% { transform: translate(-10px,5px); }
             75% { transform: translate(10px,-5px); }
         }
-        @keyframes flash-anim {
-            0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(3); }
-        }
+        @keyframes flash-anim { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(3); } }
 
-        /* --- エディタ画面 --- */
-        #editor-view { display: flex; width: 100%; height: 100%; position: relative; flex-direction: column; background: #333; }
+        /* --- エディタ --- */
+        #editor-view { display: none; width: 100%; height: 100%; position: relative; flex-direction: column; background: #333; }
         #canvas-container { flex: 1; width: 100%; height: 100%; overflow: hidden; position: relative; background: #222; }
         canvas { 
-            image-rendering: pixelated; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            transform-origin: 0 0; 
-            cursor: crosshair; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated; position: absolute; top: 0; left: 0; transform-origin: 0 0; cursor: crosshair; 
             background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
-            background-size: 2px 2px;
-            background-color: white;
+            background-size: 2px 2px; background-color: white;
         }
 
         .panel { background: var(--panel-bg); padding: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); backdrop-filter: blur(5px); z-index: 100; position: absolute; display: flex; gap: 8px; flex-wrap: wrap; }
         #top-panel { top: 10px; left: 10px; right: 10px; justify-content: space-between; align-items: center; }
-        #tool-panel { bottom: 20px; left: 50%; transform: translateX(-50%); justify-content: center; width: auto; max-width: 90%; }
+        #tool-panel { bottom: 20px; left: 50%; transform: translateX(-50%); justify-content: center; }
         #zoom-panel { bottom: 20px; right: 20px; flex-direction: column; }
-
-        .group { display: flex; gap: 5px; align-items: center; border-right: 1px solid #ccc; padding-right: 8px; }
-        .group:last-child { border: none; }
-        input[type="color"] { border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; padding: 0; background: none; }
         #status-display { position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.5); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 90;}
 
-        /* --- 草原画面 --- */
-        #field-view { 
-            display: none; width: 100%; height: 100%; position: relative; overflow: hidden;
-            background-color: #8dbd5d;
-            background-image: 
-                radial-gradient(circle at 2px 2px, #9dc96d 1px, transparent 0),
-                url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="%232d5a27"><rect x="10" y="10" width="8" height="12"/><rect x="80" y="40" width="6" height="10"/><rect x="30" y="70" width="7" height="9"/></g></svg>'),
-                url('data:image/svg+xml;utf8,<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><g fill="%234b7d3a"><path d="M20 50 L30 20 L40 50 Z M150 150 L165 110 L180 150 Z"/></g></svg>');
-            background-size: 20px 20px, 150px 150px, 300px 300px;
-        }
-        
-        .forest-edge {
-            position: absolute; width: 100%; height: 100%; pointer-events: none;
-            background-image: url('data:image/svg+xml;utf8,<svg width="60" height="80" viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg"><g fill="%232d4a1e"><path d="M30 10 L50 70 L10 70 Z"/></g></svg>');
-            background-repeat: repeat-x; background-size: 80px 100px;
-            background-position: top;
-            filter: drop-shadow(0 0 10px rgba(0,0,0,0.2));
-            z-index: 2;
-        }
+        /* --- 草原 --- */
+        #field-view { width: 100%; height: 100%; position: relative; overflow: hidden; background-color: #8dbd5d; }
+        #btn-to-book { position: absolute; top: 20px; left: 20px; background: #5d4037; color: white; border: 3px solid #3e2723; z-index: 10; padding: 10px 20px; }
+        .monster { position: absolute; image-rendering: pixelated; transform: translate(-50%, -50%); z-index: 5; }
 
-        #btn-to-book { position: absolute; top: 20px; right: 20px; background: #5d4037; color: white; border: 3px solid #3e2723; z-index: 10; font-size: 1rem; padding: 10px 20px; box-shadow: 4px 4px 0px rgba(0,0,0,0.2); }
-        .monster { position: absolute; image-rendering: pixelated; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 2px rgba(0,0,0,0.2)); z-index: 5; }
-
-        /* --- 図鑑 --- */
+        /* --- 図鑑モーダル --- */
         #book-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-        #book-content { background: #fdf5e6; border: 6px solid #5d4037; width: 90%; max-width: 600px; padding: 20px; position: relative; max-height: 80vh; overflow-y: auto; }
-        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #5d4037; font-weight: bold; }
+        #book-content { background: #fdf5e6; border: 6px solid #5d4037; width: 90%; max-width: 600px; padding: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
         #monster-list { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
-        .book-item { display: flex; align-items: center; gap: 20px; padding: 15px; border: 4px solid #d2b48c; background: #fff; }
-        .book-item img { width: 64px; height: 64px; image-rendering: pixelated; border: 1px solid #ccc; }
-        .item-info { flex: 1; }
-        .item-actions { display: flex; gap: 10px; }
-        .btn-edit { background-color: var(--primary); color: white; }
-        .btn-delete { background-color: var(--accent); color: white; }
-        .btn-create-new { background-color: #88aa44; color: white; font-size: 1.1em; padding: 10px 20px; }
+        .book-item { display: flex; flex-direction: column; padding: 10px; border: 4px solid #d2b48c; background: #fff; border-radius: 8px; }
+        .item-main { display: flex; align-items: center; gap: 15px; }
+
+        /* --- バトル画面（ダンジョン背景） --- */
+        #battle-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 2000; color: white; font-family: monospace; }
+        #battle-area { 
+            height: 50%; position: relative; overflow: hidden; 
+            background-color: #1a1a1a;
+            background-image: 
+                linear-gradient(335deg, #222 23px, transparent 23px),
+                linear-gradient(155deg, #222 23px, transparent 23px),
+                linear-gradient(335deg, #222 23px, transparent 23px),
+                linear-gradient(155deg, #222 23px, transparent 23px);
+            background-size: 58px 58px;
+            background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
+            border-bottom: 4px solid #444;
+        }
+        #battle-log { height: 35%; overflow-y: scroll; background: #000; padding: 10px; font-size: 12px; border-top: 2px solid #666; }
+
+        /* 設定 */
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
     <div id="editor-view">
         <div id="top-panel" class="panel">
-            <div class="group"><button onclick="goToField()">🔙 草原へ</button></div>
-            <div class="group">
-                <select id="gridSize">
-                    <option value="16">16x16</option>
-                    <option value="32" selected>32x32</option>
-                    <option value="64">64x64</option>
-                </select>
-            </div>
-            <div class="group"><button id="btn-save-monster" style="background: #4CAF50; color: white;">✨ 完成・保存</button></div>
+            <button onclick="goToField()">🔙 草原へ</button>
+            <select id="gridSize"><option value="16">16x16</option><option value="32" selected>32x32</option><option value="64">64x64</option></select>
+            <button id="btn-save-monster" style="background: #4CAF50; color: white;">✨ 完成</button>
         </div>
-        <div id="canvas-container"><canvas id="paintCanvas" width="32" height="32"></canvas></div>
-        <div id="status-display">Pos: 0, 0</div>
-        <div id="zoom-panel" class="panel">
-            <button onclick="zoom(1.2)">➕</button>
-            <button onclick="zoom(0.8)">➖</button>
-            <button onclick="resetView()">🔄</button>
-        </div>
+        <div id="canvas-container"><canvas id="paintCanvas"></canvas></div>
+        <div id="status-display"></div>
+        <div id="zoom-panel" class="panel"><button onclick="zoom(1.2)">➕</button><button onclick="zoom(0.8)">➖</button><button onclick="resetView()">🔄</button></div>
         <div id="tool-panel" class="panel">
-            <div class="group"><input type="color" id="colorPicker" value="#333333"></div>
-            <div class="group">
-                <button id="tool-pen" onclick="setTool('pen')" class="active">🖊️</button>
-                <button id="tool-eraser" onclick="setTool('eraser')">🧽</button>
-                <button id="tool-bucket" onclick="setTool('bucket')">🪣</button>
-                <button id="tool-picker" onclick="setTool('picker')">🧪</button>
-            </div>
-            <div class="group"><input type="range" id="penSize" min="1" max="5" value="1"></div>
-            <div class="group"><button onclick="clearCanvas()" style="background: var(--accent); color: white;">🗑️</button></div>
+            <input type="color" id="colorPicker" value="#333333">
+            <button id="tool-pen" onclick="setTool('pen')" class="active">🖊️</button>
+            <button id="tool-eraser" onclick="setTool('eraser')">🧽</button>
+            <button id="tool-bucket" onclick="setTool('bucket')">🪣</button>
+            <button id="tool-picker" onclick="setTool('picker')">🧪</button>
+            <input type="range" id="penSize" min="1" max="5" value="1">
+            <button onclick="clearCanvas()" style="background: var(--accent); color: white;">🗑️</button>
         </div>
     </div>
 
     <div id="field-view">
-        <div class="forest-edge"></div>
         <button id="btn-to-book" onclick="openBookModal()">📖 モンスター図鑑</button>
+        <button onclick="startDungeon()" style="position:absolute; bottom:20px; left:20px; background:maroon; color:white; padding:15px; border-radius:10px; z-index:100;">⚔️ ダンジョンへ</button>
         <div id="monster-field-area"></div>
     </div>
 
     <div id="book-modal">
         <div id="book-content">
-            <span class="close-modal" onclick="closeBookModal()">&times;</span>
-            <h3>📖 モンスター図鑑 <span id="monster-count">(0/3)</span></h3>
+            <span onclick="closeBookModal()" style="position:absolute; right:15px; top:10px; cursor:pointer; font-size:24px;">&times;</span>
+            <h3>📖 図鑑 <span id="monster-count"></span></h3>
             <div id="monster-list"></div>
-            <div style="text-align: center; margin-top: 20px;" id="create-new-area">
-                <button class="btn-create-new" onclick="createNewMonster()">➕ 新しい仲間を描く</button>
+            <div id="create-new-area" style="text-align:center; margin-top:20px;">
+                <button onclick="createNewMonster()" style="background:#88aa44; color:white; padding:10px 20px;">➕ 新しい仲間を描く</button>
             </div>
         </div>
     </div>
 
-    <button id="settings-btn" style="position: fixed; top: 10px; right: 10px; z-index: 1001; padding: 5px 10px; cursor: pointer; background: #333; color: white; border: 1px solid #fff;">⚙️ 設定</button>
-    <div id="settings-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center;">
-        <div style="background: #333; color: white; padding: 20px; border: 3px solid #fff; border-radius: 10px; width: 250px; text-align: center;">
-            <h3>OPTIONS</h3>
-            <div style="margin: 15px 0;">
-                <label>BGM 音量</label><br>
-                <input type="range" id="bgm-slider" min="0" max="1" step="0.01" value="0.08" style="width: 100%;">
-            </div>
-            <div style="margin: 15px 0;">
-                <label>SE 音量</label><br>
-                <input type="range" id="se-slider" min="0" max="1" step="0.01" value="0.5" style="width: 100%;">
-            </div>
-            <button id="settings-close" style="margin-top: 10px; padding: 5px 20px; cursor: pointer;">閉じる</button>
+    <div id="battle-screen">
+        <div id="floor-indicator" style="text-align:center; padding:10px; background:#333;">1階</div>
+        <div id="battle-area"></div>
+        <div id="battle-log"></div>
+        <div style="height:10%; display:flex; justify-content:center; align-items:center; gap:20px;">
+            <button id="btn-next-floor" style="display:none; background:green; color:white;" onclick="nextFloor()">次の階へ</button>
+            <button style="background:#444; color:white;" onclick="exitDungeon()">撤退</button>
+        </div>
+    </div>
+
+    <button id="settings-btn" style="position:fixed; top:10px; right:10px; z-index:1001; background:#333; color:white;">⚙️ 設定</button>
+    <div id="settings-modal">
+        <div style="background:#333; color:white; padding:20px; border:3px solid #fff; border-radius:10px; text-align:center;">
+            <h3>SETTINGS</h3>
+            BGM: <input type="range" id="bgm-slider" min="0" max="1" step="0.01" value="0.08"><br><br>
+            SE: <input type="range" id="se-slider" min="0" max="1" step="0.01" value="0.5"><br><br>
+            <button onclick="document.getElementById('settings-modal').style.display='none'">閉じる</button>
         </div>
     </div>
 
