@@ -3,7 +3,6 @@ let editingMonsterId = null;
 const MAX_MONSTERS = 5; 
 const MAX_PARTY = 3;    
 
-// 階層記録
 let maxClearedFloor = parseInt(localStorage.getItem('dot_max_cleared') || '0');
 
 const ENEMY_IMAGES = ['スケルトン.png', 'ゾンビ.png', 'ブルースライム.png', 'レッドスライム.png'];
@@ -162,6 +161,7 @@ function renderMonsterList() {
                 <div style="margin-top:5px;">特性: <select onchange="changeTrait(${m.id},this.value)">
                     <option value="">なし</option><option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
                     <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option><option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
+                    <option value="混乱" ${m.trait==='混乱'?'selected':''}>混乱</option>
                 </select>
                 <button onclick="resetParams(${m.id})" style="float:right; font-size:10px;">振り直し</button></div>
             </div>
@@ -197,30 +197,18 @@ function saveAndRefresh() { localStorage.setItem('dot_monsters', JSON.stringify(
 function editMonster(id) { editingMonsterId = id; const m = monsters.find(m => m.id === id); currentGridSize = m.size; initCanvas(); const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = m.image; closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 function createNewMonster() { editingMonsterId = null; initCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height); closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 
-function goToField() { 
-    document.getElementById('editor-view').style.display='none'; 
-    document.getElementById('field-view').style.display='block'; 
-    updateGameMusic(); 
-}
-function goToEditor() { 
-    document.getElementById('field-view').style.display='none'; 
-    document.getElementById('editor-view').style.display='flex'; 
-    updateGameMusic();
-}
+function goToField() { document.getElementById('editor-view').style.display='none'; document.getElementById('field-view').style.display='block'; updateGameMusic(); }
+function goToEditor() { document.getElementById('field-view').style.display='none'; document.getElementById('editor-view').style.display='flex'; updateGameMusic(); }
 function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display='flex'; }
 function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
 
 function spawnMonstersInField() {
-    const area = document.getElementById('monster-field-area'); 
-    if (!area) return;
+    const area = document.getElementById('monster-field-area'); if (!area) return;
     area.innerHTML = '';
     monsters.forEach(m => {
         const img = document.createElement('img'); img.src = m.image; img.className = 'monster';
-        img.style.left = (20 + Math.random() * 60) + '%'; 
-        img.style.top = (30 + Math.random() * 50) + '%';
-        img.style.width = (m.size * 2) + 'px'; 
-        area.appendChild(img); 
-        animateMonster(img);
+        img.style.left = (20 + Math.random() * 60) + '%'; img.style.top = (30 + Math.random() * 50) + '%';
+        img.style.width = (m.size * 2) + 'px'; area.appendChild(img); animateMonster(img);
     });
 }
 function animateMonster(el) {
@@ -236,21 +224,11 @@ let battleSpeed = 1;
 function openFloorSelect() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
-    
-    const select = document.getElementById('floor-select-dropdown');
-    select.innerHTML = '';
-    
+    const select = document.getElementById('floor-select-dropdown'); select.innerHTML = '';
     for (let i = 1; i <= Math.max(1, maxClearedFloor); i++) {
-        const opt = document.createElement('option');
-        opt.value = i; opt.textContent = `${i} 階`;
-        select.appendChild(opt);
+        const opt = document.createElement('option'); opt.value = i; opt.textContent = `${i} 階`; select.appendChild(opt);
     }
-    const nextOpt = document.createElement('option');
-    nextOpt.value = Math.max(1, maxClearedFloor + 1);
-    nextOpt.textContent = `${nextOpt.value} 階 (最新)`;
-    select.appendChild(nextOpt);
-    select.value = nextOpt.value;
-
+    const nextOpt = document.createElement('option'); nextOpt.value = Math.max(1, maxClearedFloor + 1); nextOpt.textContent = `${nextOpt.value} 階 (最新)`; select.appendChild(nextOpt); select.value = nextOpt.value;
     document.getElementById('floor-modal').style.display = 'flex';
 }
 
@@ -262,9 +240,7 @@ function confirmFloorAndStart() {
 
 function startDungeon(floor = 1) {
     currentFloor = floor;
-    document.getElementById('battle-screen').style.display = 'block'; 
-    setupBattle();
-    updateGameMusic();
+    document.getElementById('battle-screen').style.display = 'block'; setupBattle(); updateGameMusic();
 }
 
 function toggleBattleSpeed() {
@@ -286,9 +262,7 @@ function setupBattle() {
         const imgName = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
         const mult = isBoss ? 3 : 1; 
         enemyParty.push({ 
-            id: Math.random(), 
-            image: imgName, 
-            name: imgName.replace('.png', ''), 
+            id: Math.random(), image: imgName, name: imgName.replace('.png', ''), 
             params: { power: enemyLv * mult, speed: enemyLv * mult, hp: enemyLv * mult, intel: 0 }, 
             curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss,
             state: null, trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)]
@@ -302,47 +276,43 @@ async function runTurn() {
         let actors = [...playerParty, ...enemyParty].filter(u => u.curHp > 0).sort((a,b) => b.params.speed - a.params.speed);
         for (let u of actors) {
             if (u.curHp <= 0 || !battleActive) continue;
-            
             await new Promise(r => setTimeout(r, 800 / battleSpeed));
             
-            // 状態異常判定（行動前）
+            // 行動不能系判定
             if (u.state === '眠り') {
-                if (Math.random() < 0.7) { u.state = null; addLog(`${u.name}は目が覚めた`); }
+                if (Math.random() < 0.3) { u.state = null; addLog(`${u.name}は目が覚めた`); }
                 else { addLog(`${u.name}は眠っている...`); continue; }
             }
-            if (u.state === 'マヒ' && Math.random() < 0.2) { addLog(`${u.name}は痺れて動けない！`); continue; }
+            if (u.state === 'マヒ' && Math.random() < 0.25) { addLog(`${u.name}は体が痺れて動けない！`); continue; }
 
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
             if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
             let target = targets[Math.floor(Math.random() * targets.length)];
             
-            if (Math.random() * 100 < target.params.speed && u.side === 'e') {
-                addLog(`${u.name}の攻撃！ ...回避された`);
+            // 回避判定：ターゲットの「速」の値がそのまま回避率(%)
+            if (u.side === 'e' && Math.random() * 100 < target.params.speed) {
+                addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
             } else {
                 let dmg = u.params.power;
-                
                 let isCrit = Math.random() * 100 < (u.params.intel || 0);
-                if (isCrit) {
-                    dmg *= 2;
-                    addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`);
-                } else {
-                    addLog(`${u.name}の攻撃！`);
-                }
+                if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
+                else { addLog(`${u.name}の攻撃！`); }
 
                 target.curHp -= dmg;
                 addLog(`${target.name}に${dmg}ダメ`);
                 
-                if(window.playBattleAnimation) window.playBattleAnimation(u, target);
+                // アニメーション実行
+                playBattleAnimation(u, target);
 
-                // 状態異常判定（攻撃後付与）
+                // 状態付与・特殊効果
                 if (u.trait && !target.isBoss) {
-                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}に毒ダメージ！`); }
-                    if (u.trait === 'マヒ' && !target.state) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
+                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                    if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
                     if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
-                    if (u.trait === '混乱' && !target.state) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                    if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
                 }
-                if (target.state === '眠り' && Math.random() < 0.7) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+                if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
             }
             renderBattleUnits();
             if (checkEnd()) return;
@@ -353,12 +323,7 @@ async function runTurn() {
 function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
         battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
-        
-        if (currentFloor > maxClearedFloor) {
-            maxClearedFloor = currentFloor;
-            localStorage.setItem('dot_max_cleared', maxClearedFloor);
-        }
-
+        if (currentFloor > maxClearedFloor) { maxClearedFloor = currentFloor; localStorage.setItem('dot_max_cleared', maxClearedFloor); }
         monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
         saveAndRefresh(); document.getElementById('btn-next-floor').style.display = 'block'; return true;
     }
@@ -372,40 +337,43 @@ function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTM
 
 function renderBattleUnits() {
     const layer = document.getElementById('battle-unit-layer'); layer.innerHTML = '';
-    [...playerParty, ...enemyParty].forEach((u, i) => {
+    [...playerParty, ...enemyParty].forEach((u) => {
         if (u.curHp <= 0) return;
         const div = document.createElement('div');
         div.id = 'unit-' + String(u.id).replace('.','');
-        div.style = `position:absolute; left:${u.side=='p'?'25%':'75%'}; top:${30 + (i%3)*20}%; text-align:center; transform:translate(-50%,-50%);`;
+        div.style = `position:absolute; left:${u.side=='p'?'25%':'75%'}; top:${u.side=='p'?'50%':'40%'}; text-align:center; transform:translate(-50%,-50%); transition: transform 0.1s;`;
         div.innerHTML = `
-            <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black; margin-bottom:2px;">${u.name}</div>
-            <div style="width:40px; height:4px; background:red; margin:auto; border:1px solid #000;">
+            <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black;">${u.name}</div>
+            <div style="width:50px; height:5px; background:red; margin:5px auto; border:1px solid #000; position:relative;">
                 <div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div>
             </div>
-            <div style="color:yellow; font-size:10px; text-shadow:1px 1px 1px black; height:12px; margin-top:2px;">${u.state || ''}</div>
-            <img src="${u.image}" style="width:80px; image-rendering:pixelated; ${u.side=='e'?'transform: scaleX(-1);':''}">
+            <div style="color:yellow; font-size:11px; font-weight:bold; text-shadow:1px 1px 2px black; height:15px;">${u.state || ''}</div>
+            <img src="${u.image}" style="width:100px; image-rendering:pixelated; ${u.side=='e'?'transform: scaleX(-1);':''}">
         `;
         layer.appendChild(div);
     });
 }
 
-// 戦闘アニメーション関数
-window.playBattleAnimation = (attacker, target) => {
+function playBattleAnimation(attacker, target) {
     const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
     const tgtEl = document.getElementById('unit-' + String(target.id).replace('.',''));
+    
     if (atkEl) {
-        atkEl.classList.remove('anim-attack'); void atkEl.offsetWidth; atkEl.classList.add('anim-attack');
+        atkEl.classList.remove('anim-attack');
+        void atkEl.offsetWidth; // リフロー
+        atkEl.classList.add('anim-attack');
     }
+    
     if (tgtEl) {
-        const dmgClass = target.side === 'p' ? 'anim-damage-p' : 'anim-damage-e';
-        tgtEl.classList.remove('anim-damage-p', 'anim-damage-e'); void tgtEl.offsetWidth; tgtEl.classList.add(dmgClass);
+        const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
+        tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
+        void tgtEl.offsetWidth; // リフロー
+        tgtEl.classList.add(kbClass);
     }
-};
+}
 
 // --- オーディオ設定 ---
-window.gameAudio = {
-    field: new Audio('so_sweet.mp3'), battle: new Audio('Quick_pipes.mp3'), boss: new Audio('Battle_in_the_Moonlight.mp3'), sePoint: new Audio('point.mp3')
-};
+window.gameAudio = { field: new Audio('so_sweet.mp3'), battle: new Audio('Quick_pipes.mp3'), boss: new Audio('Battle_in_the_Moonlight.mp3'), sePoint: new Audio('point.mp3') };
 let volBGM = 0.08, volSE = 0.5;
 const allBGM = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
 allBGM.forEach(s => { s.loop = true; s.volume = volBGM; });
@@ -427,6 +395,4 @@ function updateGameMusic() {
     }
 }
 
-document.addEventListener('click', () => {
-    updateGameMusic();
-}, { once: false });
+document.addEventListener('click', () => { updateGameMusic(); }, { once: false });
