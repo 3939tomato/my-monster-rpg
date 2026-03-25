@@ -13,12 +13,21 @@
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
 
-        /* ダメージ演出（フラッシュ削除） */
-        .shake { animation: shake-anim 0.3s; }
-        @keyframes shake-anim {
-            0%, 100% { transform: translate(0,0); }
-            25% { transform: translate(-10px,5px); }
-            75% { transform: translate(10px,-5px); }
+        /* 戦闘アニメーション（揺れ・フラッシュを廃止し、跳ねる・ノックバックに変更） */
+        .anim-attack { animation: attack-anim 0.3s ease-in-out; }
+        @keyframes attack-anim {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(-50%, calc(-50% - 20px)); }
+        }
+        .anim-damage-p { animation: damage-anim-p 0.3s ease-in-out; }
+        @keyframes damage-anim-p {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(calc(-50% - 20px), -50%); }
+        }
+        .anim-damage-e { animation: damage-anim-e 0.3s ease-in-out; }
+        @keyframes damage-anim-e {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(calc(-50% + 20px), -50%); }
         }
 
         /* --- エディタ --- */
@@ -36,7 +45,7 @@
         #zoom-panel { bottom: 20px; right: 20px; flex-direction: column; }
         #status-display { position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.5); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 90;}
 
-        /* --- 草原（シンプルな芝生デザイン） --- */
+        /* --- 草原 --- */
         #field-view { 
             width: 100%; height: 100%; position: relative; overflow: hidden; 
             background-color: #8dbd5d; 
