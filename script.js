@@ -225,6 +225,14 @@ function animateMonster(el) {
     requestAnimationFrame(step);
 }
 
+// --- データリセット ---
+function resetData() {
+    if (confirm("すべてのデータを削除して最初からやり直しますか？")) {
+        localStorage.clear();
+        location.reload();
+    }
+}
+
 // --- バトルシステム ---
 let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
 let battleSpeed = 1;
@@ -318,6 +326,8 @@ async function runTurn() {
 
                     target.curHp -= dmg;
                     addLog(`${target.name}に${dmg}ダメ`);
+                    
+                    // アニメーション実行
                     playBattleAnimation(u, target);
 
                     if (u.trait && !target.isBoss) {
@@ -373,12 +383,13 @@ function renderBattleUnits() {
     });
 }
 
+// --- アニメーション発火関数 ---
 function playBattleAnimation(attacker, target) {
     if (attacker) {
         const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
         if (atkEl) {
             atkEl.classList.remove('anim-attack');
-            void atkEl.offsetWidth; // 3度確認: アニメーションを再発火させるためのリフロー
+            void atkEl.offsetWidth; // 強制リフロー（再発火用）
             atkEl.classList.add('anim-attack');
         }
     }
@@ -387,7 +398,7 @@ function playBattleAnimation(attacker, target) {
         if (tgtEl) {
             const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
             tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
-            void tgtEl.offsetWidth;
+            void tgtEl.offsetWidth; // 強制リフロー
             tgtEl.classList.add(kbClass);
         }
     }
