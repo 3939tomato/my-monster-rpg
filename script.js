@@ -287,12 +287,13 @@ function setupBattle() {
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
         const imgName = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
+        const mult = isBoss ? 3 : 1; // ドラゴン(ボス)のパラメーター3倍
         enemyParty.push({ 
             id: Math.random(), 
             image: imgName, 
             name: imgName.replace('.png', ''), 
-            params: { power: enemyLv, speed: enemyLv, hp: enemyLv, intel: 0 }, 
-            curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss 
+            params: { power: enemyLv * mult, speed: enemyLv * mult, hp: enemyLv * mult, intel: 0 }, 
+            curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss 
         });
     }
     battleActive = true; renderBattleUnits(); runTurn();
@@ -404,5 +405,5 @@ document.addEventListener('click', () => {
 
 window.playHitAnimation = () => {
     const el = document.getElementById('battle-area');
-    el.classList.remove('shake', 'hit-flash'); void el.offsetWidth; el.classList.add('shake', 'hit-flash');
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
 };
