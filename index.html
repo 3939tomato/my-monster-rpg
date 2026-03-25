@@ -13,23 +13,23 @@
         button:active { transform: translateY(0); }
         button.active { background-color: var(--primary) !important; color: white; }
 
-        /* --- アニメーション設定（画面揺れ廃止、跳ねとノックバック） --- */
+        /* --- アニメーション設定 --- */
         .anim-attack { animation: attack-jump 0.3s ease-out; }
         @keyframes attack-jump {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(-50%, calc(-50% - 30px)); } /* 上に跳ねる */
+            50% { transform: translate(-50%, calc(-50% - 40px)); }
         }
 
-        .anim-damage-p { animation: damage-kb-p 0.3s ease-out; } /* プレイヤー側：左へノックバック */
+        .anim-damage-p { animation: damage-kb-p 0.3s ease-out; }
         @keyframes damage-kb-p {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% - 20px), -50%); }
+            50% { transform: translate(calc(-50% - 30px), -50%); }
         }
 
-        .anim-damage-e { animation: damage-kb-e 0.3s ease-out; } /* 敵側：右へノックバック */
+        .anim-damage-e { animation: damage-kb-e 0.3s ease-out; }
         @keyframes damage-kb-e {
             0%, 100% { transform: translate(-50%, -50%); }
-            50% { transform: translate(calc(-50% + 20px), -50%); }
+            50% { transform: translate(calc(-50% + 30px), -50%); }
         }
 
         /* --- エディタ --- */
@@ -55,10 +55,11 @@
 
         /* --- 図鑑モーダル --- */
         #book-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-        #book-content { background: #fdf5e6; border: 6px solid #5d4037; width: 90%; max-width: 600px; padding: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
+        #book-content { background: #fdf5e6; border: 6px solid #5d4037; width: 95%; max-width: 650px; padding: 20px; position: relative; max-height: 85vh; overflow-y: auto; }
         #monster-list { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
         .book-item { display: flex; flex-direction: column; padding: 10px; border: 4px solid #d2b48c; background: #fff; border-radius: 8px; }
         .item-main { display: flex; align-items: center; gap: 15px; }
+        .name-input { border: 1px solid #ccc; padding: 4px; border-radius: 4px; width: 100px; font-size: 14px; }
 
         /* --- 戦闘画面 --- */
         #battle-screen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #444; z-index: 2000; color: white; font-family: monospace; }
@@ -67,7 +68,7 @@
             background-image: linear-gradient(335deg, #ccc 23px, transparent 23px), linear-gradient(155deg, #ccc 23px, transparent 23px), linear-gradient(335deg, #ccc 23px, transparent 23px), linear-gradient(155deg, #ccc 23px, transparent 23px);
             background-size: 58px 58px; background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
         }
-        #battle-log { position: absolute; top: 10px; left: 10px; width: 250px; height: 200px; background: rgba(0, 0, 0, 0.6); padding: 10px; font-size: 12px; overflow-y: scroll; border: 1px solid #888; border-radius: 5px; z-index: 2100; }
+        #battle-log { position: absolute; top: 10px; left: 10px; width: 250px; height: 180px; background: rgba(0, 0, 0, 0.7); padding: 10px; font-size: 12px; overflow-y: scroll; border: 1px solid #888; border-radius: 5px; z-index: 2100; }
         #battle-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 2100; }
 
         /* --- 階層選択 --- */
@@ -130,7 +131,7 @@
         <div id="battle-area">
             <div id="floor-indicator" style="position:absolute; top:10px; right:10px; padding:10px; background:rgba(0,0,0,0.5); border-radius:5px;">1階</div>
             <div id="battle-log"></div>
-            <div id="battle-unit-layer"></div>
+            <div id="battle-unit-layer" style="width:100%; height:100%; position:relative;"></div>
         </div>
         <div id="battle-controls">
             <button id="btn-speed-toggle" style="background:#444; color:white; width: 80px;" onclick="toggleBattleSpeed()">倍速:1x</button>
