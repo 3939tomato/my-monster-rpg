@@ -3,6 +3,9 @@ let editingMonsterId = null;
 const MAX_MONSTERS = 5; 
 const MAX_PARTY = 3;    
 
+// 階層記録
+let maxClearedFloor = parseInt(localStorage.getItem('dot_max_cleared') || '0');
+
 const ENEMY_IMAGES = ['スケルトン.png', 'ゾンビ.png', 'ブルースライム.png', 'レッドスライム.png'];
 const BOSS_IMAGE = 'ドラゴン.png';
 
@@ -228,12 +231,48 @@ function animateMonster(el) {
 
 // --- バトルシステム ---
 let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
+let battleSpeed = 1;
 
-function startDungeon() {
+// 階層選択機能
+function openFloorSelect() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
-    currentFloor = 1; document.getElementById('battle-screen').style.display = 'block'; setupBattle();
+    
+    const select = document.getElementById('floor-select-dropdown');
+    select.innerHTML = '';
+    
+    // 1階から「クリア済み最高階層」までを選べる
+    for (let i = 1; i <= Math.max(1, maxClearedFloor); i++) {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = `${i} 階`;
+        select.appendChild(opt);
+    }
+    // 未クリアの階も追加（常に最新の階に挑戦できるように）
+    const nextOpt = document.createElement('option');
+    nextOpt.value = Math.max(1, maxClearedFloor + 1);
+    nextOpt.textContent = `${nextOpt.value} 階 (最新)`;
+    select.appendChild(nextOpt);
+    select.value = nextOpt.value;
+
+    document.getElementById('floor-modal').style.display = 'flex';
+}
+
+function confirmFloorAndStart() {
+    currentFloor = parseInt(document.getElementById('floor-select-dropdown').value);
+    document.getElementById('floor-modal').style.display = 'none';
+    startDungeon(currentFloor);
+}
+
+function startDungeon(floor = 1) {
+    currentFloor = floor;
+    document.getElementById('battle-screen').style.display = 'block'; 
+    setupBattle();
     updateGameMusic();
+}
+
+function toggleBattleSpeed() {
+    battleSpeed = (battleSpeed === 1) ? 2 : 1;
+    document.getElementById('btn-speed-toggle').textContent = `倍速:${battleSpeed}x`;
 }
 
 function setupBattle() {
@@ -252,7 +291,7 @@ function setupBattle() {
             id: Math.random(), 
             image: imgName, 
             name: imgName.replace('.png', ''), 
-            params: { power: enemyLv, speed: enemyLv, hp: enemyLv }, 
+            params: { power: enemyLv, speed: enemyLv, hp: enemyLv, intel: 0 }, 
             curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss 
         });
     }
@@ -264,16 +303,30 @@ async function runTurn() {
         let actors = [...playerParty, ...enemyParty].filter(u => u.curHp > 0).sort((a,b) => b.params.speed - a.params.speed);
         for (let u of actors) {
             if (u.curHp <= 0 || !battleActive) continue;
-            await new Promise(r => setTimeout(r, 800));
+            
+            // 倍速モードに対応した待機時間
+            await new Promise(r => setTimeout(r, 800 / battleSpeed));
+            
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
             if (targets.length === 0) break;
             let target = targets[Math.floor(Math.random() * targets.length)];
             
-            if (Math.random() * 100 < target.params.speed) {
+            if (Math.random() * 100 < target.params.speed && u.side === 'e') {
                 addLog(`${u.name}の攻撃！ ...回避された`);
             } else {
-                let dmg = u.params.power; target.curHp -= dmg;
-                addLog(`${u.name}の攻撃！ ${target.name}に${dmg}ダメ`);
+                let dmg = u.params.power;
+                
+                // クリティカル判定（知力 = 発生率%）
+                let isCrit = Math.random() * 100 < (u.params.intel || 0);
+                if (isCrit) {
+                    dmg *= 2;
+                    addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`);
+                } else {
+                    addLog(`${u.name}の攻撃！`);
+                }
+
+                target.curHp -= dmg;
+                addLog(`${target.name}に${dmg}ダメ`);
                 if(window.playHitAnimation) window.playHitAnimation();
             }
             renderBattleUnits();
@@ -285,6 +338,13 @@ async function runTurn() {
 function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
         battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
+        
+        // クリア階層を記録
+        if (currentFloor > maxClearedFloor) {
+            maxClearedFloor = currentFloor;
+            localStorage.setItem('dot_max_cleared', maxClearedFloor);
+        }
+
         monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
         saveAndRefresh(); document.getElementById('btn-next-floor').style.display = 'block'; return true;
     }
@@ -325,29 +385,19 @@ document.getElementById('settings-btn').onclick = () => document.getElementById(
 document.getElementById('bgm-slider').oninput = (e) => { volBGM = e.target.value; allBGM.forEach(s => s.volume = volBGM); };
 document.getElementById('se-slider').oninput = (e) => { volSE = e.target.value; window.gameAudio.sePoint.volume = volSE; };
 
-// BGM管理ロジックの修正
 function updateGameMusic() {
     allBGM.forEach(s => s.pause());
-    
-    // 現在どの画面が表示されているかをチェック
     const editorVisible = document.getElementById('editor-view').style.display === 'flex';
     const battleVisible = document.getElementById('battle-screen').style.display === 'block';
-
-    if (editorVisible) {
-        // お絵描き中は無音
-        return;
-    }
-
+    if (editorVisible) return;
     if (battleVisible) {
         if (currentFloor % 10 === 0) window.gameAudio.boss.play().catch(()=>{});
         else window.gameAudio.battle.play().catch(()=>{});
     } else {
-        // 草原画面（デフォルト）
         window.gameAudio.field.play().catch(()=>{});
     }
 }
 
-// 最初のクリックで確実にBGMをスタートさせる
 document.addEventListener('click', () => {
     updateGameMusic();
 }, { once: false });
