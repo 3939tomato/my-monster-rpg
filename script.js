@@ -536,144 +536,9 @@ function exitDungeon() { battleActive = false; document.getElementById('battle-s
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
 function renderBattleUnits() {
-    const area = document.getElementById('battle-area');
-    area.innerHTML = '';
-    [...playerParty, ...enemyParty].forEach((u, i) => {
-        if (u.curHp <= 0) return;
-        const div = document.createElement('div');
-        div.style = `position:absolute; transition:0.3s; left:${u.side=='p'?'20%':'70%'}; top:${20 + (i%3)*25}%; text-align:center;`;
-        div.innerHTML = `
-            <div style="width:40px; height:4px; background:red; margin:auto;"><div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div></div>
-            <img src="${u.image}" style="width:50px; image-rendering:pixelated; ${u.side=='e'?'filter:hue-rotate(90deg)':''}">
-            <div style="font-size:10px;">${u.state || ''}</div>
-        `;
-        area.appendChild(div);
-    });
-}
-
-/* --- 【決定版】BGM管理システム（お絵描き中は消音） --- */
-
-// 1. 音源の定義
-const trackField = new Audio('so_sweet.mp3');
-const trackBattle = new Audio('Quick_pipes.mp3');
-const trackBoss = new Audio('Battle_in_the_Moonlight.mp3');
-
-[trackField, trackBattle, trackBoss].forEach(s => {
-    s.loop = true;
-    s.volume = 0.08; // 音量8%
-});
-
-// 2. 状態をチェックして曲を変えるメイン関数
-function syncBGM() {
-    // 一旦すべての曲を止める
-    [trackField, trackBattle, trackBoss].forEach(s => {
-        s.pause();
-    });
-
-    // 各画面の表示状態を取得
-    const isEditor = document.getElementById('editor-view').style.display !== 'none'; // お絵描き画面
-    const isBattle = document.getElementById('battle-screen').style.display !== 'none'; // バトル画面
-    const isField = document.getElementById('field-view').style.display !== 'none'; // 草原画面
-
-    // 優先順位をつけて再生
-    if (isEditor) {
-        // お絵描き中は何も流さない（すべて停止のまま）
-        console.log("BGM: お絵描き中につき停止");
-    } 
-    else if (isBattle) {
-        // バトル中：10階ごとのボス判定
-        const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
-        if (isBoss) {
-            trackBoss.play().catch(() => {});
-            console.log("BGM: ボス戦開始");
-        } else {
-            trackBattle.play().catch(() => {});
-            console.log("BGM: 通常バトル開始");
-        }
-    } 
-    else if (isField) {
-        // 草原
-        trackField.play().catch(() => {});
-        console.log("BGM: 草原");
-    }
-}
-
-// 3. 画面が切り替わる「きっかけ」すべてにこの関数を当てる
-// どこをクリックしても、画面状態をチェックして曲を合わせ直す（最強の力技）
-document.addEventListener('click', () => {
-    // 画面の切り替わりアニメーション待ちとして0.1秒後に実行
-    setTimeout(syncBGM, 100);
-});
-
-// 各種重要関数が終わった後にも念のため実行
-const bgmHooks = ['setupBattle', 'nextFloor', 'exitDungeon', 'goToField', 'editMonster'];
-bgmHooks.forEach(funcName => {
-    if (window[funcName]) {
-        const original = window[funcName];
-        window[funcName] = function(...args) {
-            const result = original.apply(this, args);
-            setTimeout(syncBGM, 150);
-            return result;
-        };
-    }
-});
-
-// 4. 起動時
-setTimeout(syncBGM, 500);
-
-/* --- 機能追加：音量・SE・アニメーション --- */
-
-// 効果音の読み込み（point.mp3をアップロードしておいてください）
-const sePoint = new Audio('point.mp3'); 
-
-// 1. 音量調節の連動
-const volSlider = document.getElementById('volume-slider');
-volSlider.addEventListener('input', (e) => {
-    const vol = e.target.value;
-    // BGMの音量を一括更新
-    [trackField, trackBattle, trackBoss].forEach(s => s.volume = vol);
-    // 効果音の音量も合わせる
-    sePoint.volume = vol;
-});
-
-// 2. ポイントを振った時に音を出す
-// あなたのコード内の「ポイントを増やすボタン」の処理に割り込みます
-const originalAddPoint = window.addPoint; // 元々のポイント増加関数名に合わせてください
-window.addPoint = function(stat) {
-    if (originalAddPoint) originalAddPoint(stat);
-    
-    // 音を再生（再生中の場合は巻き戻して鳴らす）
-    sePoint.currentTime = 0;
-    sePoint.play().catch(() => {});
-};
-
-// 3. 戦闘アニメーション
-// 攻撃がヒットした瞬間に呼び出す関数
-function playHitAnimation(isEnemyTarget) {
-    // 敵を揺らすか、自分を揺らすか
-    const targetId = isEnemyTarget ? 'enemy-monster-canvas' : 'player-monster-canvas';
-    const element = document.getElementById(targetId);
-    
-    if (element) {
-        // クラスを一度消して、再度つけることでアニメーションを再生
-        element.classList.remove('shake', 'hit-flash');
-        void element.offsetWidth; // リフロー発生（おまじない）
-        element.classList.add('shake', 'hit-flash');
-    }
-}
-
-// 既存のバトルログ表示やダメージ計算のところにアニメーションを割り込ませる
-const originalBattleLog = window.updateBattleLog; // バトル進行関数
-if (window.setupBattle) {
-    // 攻撃処理が行われるたびにアニメを流すように改造
-    // ※あなたのバトルの仕組み（attack関数など）に合わせて調整が必要です
-    // 例：ダメージが発生する場所に playHitAnimation(true); を追記する
-}
-
 /* --- 【完全統合版】BGM・SE・設定システム --- */
 
-// --- 1. 音源の定義（重複エラー防止のため一度だけ定義） ---
-// もし他で定義していても上書きするように window オブジェクトに持たせます
+// --- 1. 音源の定義 ---
 window.gameAudio = {
     field: new Audio('so_sweet.mp3'),
     battle: new Audio('Quick_pipes.mp3'),
@@ -681,14 +546,13 @@ window.gameAudio = {
     sePoint: new Audio('point.mp3')
 };
 
-// 初期設定
 let volBGM = 0.08;
 let volSE = 0.5;
 
 const allBGMTracks = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
 allBGMTracks.forEach(s => { s.loop = true; s.volume = volBGM; });
 
-// --- 2. 設定画面の連動（ボタンがある場合のみ動作） ---
+// --- 2. 設定画面の連動 ---
 const btnSet = document.getElementById('settings-btn');
 const modalSet = document.getElementById('settings-modal');
 const btnClose = document.getElementById('settings-close');
@@ -719,7 +583,7 @@ function updateGameMusic() {
     const isBattle = document.getElementById('battle-screen')?.style.display !== 'none';
     const isField = document.getElementById('field-view')?.style.display !== 'none';
 
-    if (isEditor) return; // お絵描き中は無音
+    if (isEditor) return;
 
     if (isBattle) {
         const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
@@ -730,7 +594,6 @@ function updateGameMusic() {
     }
 }
 
-// クリック時に音を更新
 document.addEventListener('click', () => setTimeout(updateGameMusic, 100));
 
 // --- 4. ポイント振りの効果音割り込み ---
@@ -753,5 +616,3 @@ window.playHitAnimation = function(isEnemy) {
         el.classList.add('shake', 'hit-flash');
     }
 };
-
-console.log("Audio System Loaded: 準備完了！");
