@@ -13,14 +13,7 @@ let currentTool = 'pen';
 let isDrawing = false;
 let isPanning = false;
 
-let viewState = {
-    scale: 10,
-    pointX: 0,
-    pointY: 0,
-    startX: 0,
-    startY: 0,
-    panning: false
-};
+let viewState = { scale: 10, pointX: 0, pointY: 0, startX: 0, startY: 0, panning: false };
 
 window.onload = () => {
     const saved = localStorage.getItem('dot_monsters');
@@ -182,28 +175,118 @@ document.getElementById('btn-save-monster').onclick = () => {
     const dataUrl = canvas.toDataURL();
     if (editingMonsterId !== null) {
         const i = monsters.findIndex(m => m.id === editingMonsterId);
-        if (i !== -1) { monsters[i].image = dataUrl; monsters[i].size = currentGridSize; }
+        if (i !== -1) {
+            monsters[i].image = dataUrl;
+            monsters[i].size = currentGridSize;
+        }
     } else {
-        if (monsters.length >= MAX_MONSTERS) { alert("3体までです。"); return; }
-        monsters.push({ id: Date.now(), image: dataUrl, size: currentGridSize });
+        if (monsters.length >= MAX_MONSTERS) {
+            alert(`最大${MAX_MONSTERS}体までです。`);
+            return;
+        }
+        monsters.push({
+            id: Date.now(),
+            image: dataUrl,
+            size: currentGridSize,
+            level: 1,
+            points: 1,
+            params: { power: 1, speed: 1, hp: 1, intel: 1 },
+            trait: null
+        });
     }
+    
     localStorage.setItem('dot_monsters', JSON.stringify(monsters));
     editingMonsterId = null;
     spawnMonstersInField();
     goToField();
+    openBookModal();
 };
 
 function renderMonsterList() {
-    const cont = document.getElementById('monster-list');
-    cont.innerHTML = '';
+    const listCont = document.getElementById('monster-list');
+    if (!listCont) return;
+    
+    listCont.innerHTML = '';
     document.getElementById('monster-count').textContent = `(${monsters.length}/${MAX_MONSTERS})`;
     document.getElementById('create-new-area').style.display = monsters.length >= MAX_MONSTERS ? 'none' : 'block';
+
     monsters.forEach((m, i) => {
+        if (!m.params) {
+            m.level = 1; m.points = 1; m.trait = null;
+            m.params = { power: 1, speed: 1, hp: 1, intel: 1 };
+        }
+
         const item = document.createElement('div');
         item.className = 'book-item';
-        item.innerHTML = `<img src="${m.image}"><div class="item-info"><strong>仲間 #${i+1}</strong></div><div class="item-actions"><button class="btn-edit" onclick="editMonster(${m.id})">🔧</button><button class="btn-delete" onclick="deleteMonster(${m.id})">🗑️</button></div>`;
-        cont.appendChild(item);
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+
+        item.innerHTML = `
+            <div style="display:flex; width:100%; gap:15px; align-items:center;">
+                <img src="${m.image}" style="width:64px; height:64px; border:1px solid #ccc;">
+                <div class="item-info">
+                    <strong>仲間 No.${i+1} (Lv.${m.level})</strong><br>
+                    残りポイント: <b style="color:red; font-size:1.2em;">${m.points}</b>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-edit" onclick="editMonster(${m.id})">描く</button>
+                    <button class="btn-delete" onclick="deleteMonster(${m.id})">別れ</button>
+                </div>
+            </div>
+            
+            <div style="width:100%; margin-top:10px; background:#f0f0f0; padding:10px; font-size:13px;">
+                <div>パワー(攻): ${m.params.power} <button onclick="addParam(${m.id}, 'power')">＋</button></div>
+                <div>スピード(速/避): ${m.params.speed} <button onclick="addParam(${m.id}, 'speed')">＋</button></div>
+                <div>体力(HP/回復): ${m.params.hp} <button onclick="addParam(${m.id}, 'hp')">＋</button></div>
+                <div>知能: ${m.params.intel} <button onclick="addParam(${m.id}, 'intel')">＋</button></div>
+                <div style="margin-top:5px; border-top:1px solid #ccc; pt:5px;">
+                    特性(5pt): 
+                    <select onchange="changeTrait(${m.id}, this.value)">
+                        <option value="">なし</option>
+                        <option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
+                        <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option>
+                        <option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
+                        <option value="混乱" ${m.trait==='混乱'?'selected':''}>混乱</option>
+                    </select>
+                </div>
+            </div>
+        `;
+        listCont.appendChild(item);
     });
+}
+
+function addParam(id, key) {
+    const m = monsters.find(m => m.id === id);
+    if (m && m.points > 0) {
+        m.params[key]++;
+        m.points--;
+        saveAndRefresh();
+        // ★ポイントを振った時のSEを鳴らす
+        if(window.gameAudio) {
+            window.gameAudio.sePoint.currentTime = 0;
+            window.gameAudio.sePoint.play().catch(()=>{});
+        }
+    }
+}
+
+function changeTrait(id, val) {
+    const m = monsters.find(m => m.id === id);
+    if (!m) return;
+    if (val === "") { m.trait = null; saveAndRefresh(); return; }
+    if (m.trait === val) return;
+    if (m.points >= 5) {
+        m.trait = val;
+        m.points -= 5;
+        saveAndRefresh();
+    } else {
+        alert("ポイントが5足りません");
+        renderMonsterList();
+    }
+}
+
+function saveAndRefresh() {
+    localStorage.setItem('dot_monsters', JSON.stringify(monsters));
+    renderMonsterList();
 }
 
 function editMonster(id) {
@@ -276,141 +359,12 @@ function animateMonster(el) {
     requestAnimationFrame(step);
 }
 
-// --- 1. RPGシステム用追加変数 ---
+// --- バトル・ダンジョン システム ---
 let currentFloor = 1;
 let battleActive = false;
 let playerParty = [];
 let enemyParty = [];
 
-// --- 2. 既存のセーブ処理を拡張 (完成ボタン押下時) ---
-// 既存のボタン取得
-const saveBtn = document.getElementById('btn-save-monster');
-
-if (saveBtn) {
-    saveBtn.onclick = () => {
-        const dataUrl = canvas.toDataURL();
-        
-        if (editingMonsterId !== null) {
-            const i = monsters.findIndex(m => m.id === editingMonsterId);
-            if (i !== -1) {
-                monsters[i].image = dataUrl;
-                monsters[i].size = currentGridSize;
-            }
-        } else {
-            if (monsters.length >= MAX_MONSTERS) {
-                alert(`最大${MAX_MONSTERS}体までです。`);
-                return;
-            }
-            // 新規作成時はLv1、初期ポイント1を付与
-            monsters.push({
-                id: Date.now(),
-                image: dataUrl,
-                size: currentGridSize,
-                level: 1,
-                points: 1,
-                params: { power: 1, speed: 1, hp: 1, intel: 1 },
-                trait: null
-            });
-        }
-        
-        localStorage.setItem('dot_monsters', JSON.stringify(monsters));
-        editingMonsterId = null;
-        spawnMonstersInField();
-        goToField();
-        // 完成直後に設定画面（図鑑）を開く
-        openBookModal();
-    };
-}
-
-// --- 3. 図鑑（強化画面）の表示更新 ---
-// 既存の renderMonsterList を「パラメータ・特性設定付き」に書き換え
-function renderMonsterList() {
-    const listCont = document.getElementById('monster-list');
-    if (!listCont) return;
-    
-    listCont.innerHTML = '';
-    document.getElementById('monster-count').textContent = `(${monsters.length}/${MAX_MONSTERS})`;
-    document.getElementById('create-new-area').style.display = monsters.length >= MAX_MONSTERS ? 'none' : 'block';
-
-    monsters.forEach((m, i) => {
-        // パラメータがない旧データへの補完
-        if (!m.params) {
-            m.level = 1; m.points = 1; m.trait = null;
-            m.params = { power: 1, speed: 1, hp: 1, intel: 1 };
-        }
-
-        const item = document.createElement('div');
-        item.className = 'book-item';
-        item.style.flexDirection = 'column';
-        item.style.alignItems = 'flex-start';
-
-        item.innerHTML = `
-            <div style="display:flex; width:100%; gap:15px; align-items:center;">
-                <img src="${m.image}" style="width:64px; height:64px; border:1px solid #ccc;">
-                <div class="item-info">
-                    <strong>仲間 No.${i+1} (Lv.${m.level})</strong><br>
-                    残りポイント: <b style="color:red; font-size:1.2em;">${m.points}</b>
-                </div>
-                <div class="item-actions">
-                    <button class="btn-edit" onclick="editMonster(${m.id})">描く</button>
-                    <button class="btn-delete" onclick="deleteMonster(${m.id})">別れ</button>
-                </div>
-            </div>
-            
-            <div style="width:100%; margin-top:10px; background:#f0f0f0; padding:10px; font-size:13px;">
-                <div>パワー(攻): ${m.params.power} <button onclick="addParam(${m.id}, 'power')">＋</button></div>
-                <div>スピード(速/避): ${m.params.speed} <button onclick="addParam(${m.id}, 'speed')">＋</button></div>
-                <div>体力(HP/回復): ${m.params.hp} <button onclick="addParam(${m.id}, 'hp')">＋</button></div>
-                <div>知能: ${m.params.intel} <button onclick="addParam(${m.id}, 'intel')">＋</button></div>
-                <div style="margin-top:5px; border-top:1px solid #ccc; pt:5px;">
-                    特性(5pt): 
-                    <select onchange="changeTrait(${m.id}, this.value)">
-                        <option value="">なし</option>
-                        <option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
-                        <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option>
-                        <option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
-                        <option value="混乱" ${m.trait==='混乱'?'selected':''}>混乱</option>
-                    </select>
-                </div>
-            </div>
-        `;
-        listCont.appendChild(item);
-    });
-}
-
-// パラメータアップ
-function addParam(id, key) {
-    const m = monsters.find(m => m.id === id);
-    if (m && m.points > 0) {
-        m.params[key]++;
-        m.points--;
-        saveAndRefresh();
-    }
-}
-
-// 特性変更
-function changeTrait(id, val) {
-    const m = monsters.find(m => m.id === id);
-    if (!m) return;
-    if (val === "") { m.trait = null; saveAndRefresh(); return; }
-    if (m.trait === val) return;
-    if (m.points >= 5) {
-        m.trait = val;
-        m.points -= 5;
-        saveAndRefresh();
-    } else {
-        alert("ポイントが5足りません");
-        renderMonsterList();
-    }
-}
-
-function saveAndRefresh() {
-    localStorage.setItem('dot_monsters', JSON.stringify(monsters));
-    renderMonsterList();
-}
-
-// --- 4. バトル・ダンジョン UI 追加 ---
-// HTMLにバトル用の画面がない場合、動的に追加
 if (!document.getElementById('battle-screen')) {
     const bScr = document.createElement('div');
     bScr.id = 'battle-screen';
@@ -426,7 +380,6 @@ if (!document.getElementById('battle-screen')) {
     `;
     document.body.appendChild(bScr);
     
-    // 草原画面にダンジョンボタンを追加
     const field = document.getElementById('field-view');
     const dBtn = document.createElement('button');
     dBtn.innerHTML = "⚔️ ダンジョンへ";
@@ -435,7 +388,6 @@ if (!document.getElementById('battle-screen')) {
     field.appendChild(dBtn);
 }
 
-// --- 5. バトルロジック ---
 function startDungeon() {
     if (monsters.length === 0) return alert("仲間がいません");
     currentFloor = 1;
@@ -478,7 +430,6 @@ async function runTurn() {
             if (u.curHp <= 0 || !battleActive) continue;
             await new Promise(r => setTimeout(r, 600));
 
-            // 状態異常判定
             if (u.state === '眠り') {
                 if (Math.random() < 0.7) { u.state = null; addLog(`${u.side=='p'?'味方':'敵'}は目が覚めた`); }
                 else { addLog(`${u.side=='p'?'味方':'敵'}は眠っている...`); continue; }
@@ -491,7 +442,6 @@ async function runTurn() {
 
             let target = targets[Math.floor(Math.random() * targets.length)];
             
-            // 攻撃
             if (Math.random() * 100 < target.params.speed) {
                 addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ...回避された`);
             } else {
@@ -499,7 +449,9 @@ async function runTurn() {
                 target.curHp -= dmg;
                 addLog(`${u.side=='p'?'味方':'敵'}の攻撃！ ${target.side=='p'?'味方':'敵'}に${dmg}ダメ`);
                 
-                // 特性発動
+                // ★攻撃がヒットした時に画面を揺らす！
+                if(window.playHitAnimation) window.playHitAnimation();
+
                 if (u.trait && !target.isBoss) {
                     if (u.trait === '毒') { target.curHp -= 2; addLog("毒ダメージ！"); }
                     if (u.trait === 'マヒ') { target.state = 'マヒ'; addLog("マヒさせた！"); }
@@ -536,9 +488,22 @@ function exitDungeon() { battleActive = false; document.getElementById('battle-s
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
 function renderBattleUnits() {
-/* --- 【完全統合版】BGM・SE・設定システム --- */
+    const area = document.getElementById('battle-area');
+    area.innerHTML = '';
+    [...playerParty, ...enemyParty].forEach((u, i) => {
+        if (u.curHp <= 0) return;
+        const div = document.createElement('div');
+        div.style = `position:absolute; transition:0.3s; left:${u.side=='p'?'20%':'70%'}; top:${20 + (i%3)*25}%; text-align:center;`;
+        div.innerHTML = `
+            <div style="width:40px; height:4px; background:red; margin:auto;"><div style="width:${(u.curHp/u.maxHp)*100}%; height:100%; background:lime;"></div></div>
+            <img src="${u.image}" style="width:50px; image-rendering:pixelated; ${u.side=='e'?'filter:hue-rotate(90deg)':''}">
+            <div style="font-size:10px;">${u.state || ''}</div>
+        `;
+        area.appendChild(div);
+    });
+}
 
-// --- 1. 音源の定義 ---
+/* --- 【完全統合版】BGM・SE・設定システム --- */
 window.gameAudio = {
     field: new Audio('so_sweet.mp3'),
     battle: new Audio('Quick_pipes.mp3'),
@@ -552,7 +517,6 @@ let volSE = 0.5;
 const allBGMTracks = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
 allBGMTracks.forEach(s => { s.loop = true; s.volume = volBGM; });
 
-// --- 2. 設定画面の連動 ---
 const btnSet = document.getElementById('settings-btn');
 const modalSet = document.getElementById('settings-modal');
 const btnClose = document.getElementById('settings-close');
@@ -575,7 +539,6 @@ if (sliSE) {
     };
 }
 
-// --- 3. BGM切り替えロジック ---
 function updateGameMusic() {
     allBGMTracks.forEach(s => s.pause());
 
@@ -583,7 +546,7 @@ function updateGameMusic() {
     const isBattle = document.getElementById('battle-screen')?.style.display !== 'none';
     const isField = document.getElementById('field-view')?.style.display !== 'none';
 
-    if (isEditor) return;
+    if (isEditor) return; // お絵描き中は無音
 
     if (isBattle) {
         const isBoss = (typeof currentFloor !== 'undefined' && currentFloor % 10 === 0);
@@ -596,23 +559,14 @@ function updateGameMusic() {
 
 document.addEventListener('click', () => setTimeout(updateGameMusic, 100));
 
-// --- 4. ポイント振りの効果音割り込み ---
-const oldAddPoint = window.addPoint;
-window.addPoint = function(stat) {
-    if (oldAddPoint) oldAddPoint(stat);
-    const s = window.gameAudio.sePoint;
-    s.currentTime = 0;
-    s.volume = volSE;
-    s.play().catch(() => {});
-};
-
-// --- 5. 戦闘アニメーション関数 ---
-window.playHitAnimation = function(isEnemy) {
-    const id = isEnemy ? 'enemy-monster-canvas' : 'player-monster-canvas';
-    const el = document.getElementById(id);
+// 戦闘アニメーション関数（画面全体を揺らす）
+window.playHitAnimation = function() {
+    const el = document.getElementById('battle-area');
     if (el) {
         el.classList.remove('shake', 'hit-flash');
         void el.offsetWidth;
         el.classList.add('shake', 'hit-flash');
     }
 };
+
+console.log("全システム正常起動完了！");
