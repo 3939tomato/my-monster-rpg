@@ -127,7 +127,8 @@ document.getElementById('btn-save-monster').onclick = () => {
         if (m) { m.image = dataUrl; m.size = currentGridSize; }
     } else {
         if (monsters.length >= MAX_MONSTERS) return alert("上限です");
-        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 1, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
+        // 初期ポイントを5に変更
+        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 5, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
     }
     saveAndRefresh();
     spawnMonstersInField();
@@ -191,7 +192,8 @@ function addParam(id, k) {
 
 function resetParams(id) {
     const m = monsters.find(m => m.id === id);
-    if (m && confirm("リセットしますか？")) { m.points = m.level; m.params = { power: 1, speed: 1, hp: 1, intel: 1 }; m.trait = null; saveAndRefresh(); }
+    // 初期ポイントが5なので、現在のレベル+4ポイントが返ってくるように修正
+    if (m && confirm("リセットしますか？")) { m.points = m.level + 4; m.params = { power: 1, speed: 1, hp: 1, intel: 1 }; m.trait = null; saveAndRefresh(); }
 }
 
 function changeTrait(id, v) {
@@ -304,18 +306,23 @@ async function runTurn() {
             if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
 
+            let animatedAttacker = null;
+            let animatedTargets = [];
+
             if (u.isBoss && Math.random() < 0.25) {
                 addLog(`<b style="color:red;">ドラゴンの全体攻撃！</b>`);
-                playBattleAnimation(u, null); 
+                animatedAttacker = u;
                 for (let target of targets) {
                     let dmg = Math.floor(u.params.power * 0.7);
                     target.curHp -= dmg;
                     addLog(`${target.name}に${dmg}ダメ`);
-                    playBattleAnimation(null, target); 
+                    animatedTargets.push(target);
                 }
             } else {
                 let target = targets[Math.floor(Math.random() * targets.length)];
                 let evadeProb = Math.max(0, target.params.speed - u.params.speed);
+                animatedAttacker = u;
+                
                 if (Math.random() * 100 < evadeProb) {
                     addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
                 } else {
@@ -326,9 +333,7 @@ async function runTurn() {
 
                     target.curHp -= dmg;
                     addLog(`${target.name}に${dmg}ダメ`);
-                    
-                    // アニメーション実行
-                    playBattleAnimation(u, target);
+                    animatedTargets.push(target);
 
                     if (u.trait && !target.isBoss) {
                         if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
@@ -339,7 +344,18 @@ async function runTurn() {
                     if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
                 }
             }
+            
+            // アニメーションを正常に動かすために先にDOMを更新する
             renderBattleUnits();
+            
+            // DOM更新直後にアニメーションクラスを付与する
+            if (animatedAttacker) {
+                playBattleAnimation(animatedAttacker, null);
+            }
+            for (let tgt of animatedTargets) {
+                playBattleAnimation(null, tgt);
+            }
+
             if (checkEnd()) return;
         }
     }
@@ -370,7 +386,7 @@ function renderBattleUnits() {
 
         const div = document.createElement('div');
         div.id = 'unit-' + String(u.id).replace('.','');
-        div.style = `position:absolute; left:${leftPos}%; top:${topPos}%; text-align:center; transform:translate(-50%,-50%); transition: transform 0.1s;`;
+        div.style = `position:absolute; left:${leftPos}%; top:${topPos}%; text-align:center; transform:translate(-50%,-50%);`;
         div.innerHTML = `
             <div style="color:white; font-size:12px; text-shadow:1px 1px 2px black;">${u.name}</div>
             <div style="width:50px; height:5px; background:red; margin:5px auto; border:1px solid #000; position:relative;">
@@ -383,13 +399,12 @@ function renderBattleUnits() {
     });
 }
 
-// --- アニメーション発火関数 ---
 function playBattleAnimation(attacker, target) {
     if (attacker) {
         const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
         if (atkEl) {
             atkEl.classList.remove('anim-attack');
-            void atkEl.offsetWidth; // 強制リフロー（再発火用）
+            void atkEl.offsetWidth; // アニメーションを確実に再起動するためのリフロー
             atkEl.classList.add('anim-attack');
         }
     }
@@ -398,7 +413,7 @@ function playBattleAnimation(attacker, target) {
         if (tgtEl) {
             const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
             tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
-            void tgtEl.offsetWidth; // 強制リフロー
+            void tgtEl.offsetWidth; // アニメーションを確実に再起動するためのリフロー
             tgtEl.classList.add(kbClass);
         }
     }
