@@ -127,8 +127,7 @@ document.getElementById('btn-save-monster').onclick = () => {
         if (m) { m.image = dataUrl; m.size = currentGridSize; }
     } else {
         if (monsters.length >= MAX_MONSTERS) return alert("上限です");
-        // 初期ポイントを5に変更
-        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 5, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, inParty: false });
+        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 5, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, passives: [], inParty: false });
     }
     saveAndRefresh();
     spawnMonstersInField();
@@ -168,6 +167,18 @@ function renderMonsterList() {
                     <option value="混乱" ${m.trait==='混乱'?'selected':''}>混乱</option>
                 </select>
                 <button onclick="resetParams(${m.id})" style="float:right; font-size:10px;">振り直し</button></div>
+                <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ccc;">パッシブ: 
+                    <select id="passive-select-${m.id}">
+                        <option value="全体攻撃">全体攻撃</option>
+                        <option value="連続攻撃">連続攻撃</option>
+                        <option value="庇う">庇う</option>
+                        <option value="自己再生">自己再生</option>
+                        <option value="状態異常無効">状態異常無効</option>
+                        <option value="限界突破">限界突破</option>
+                    </select>
+                    <button onclick="addPassive(${m.id})">習得</button>
+                    <span style="font-size:11px; color:#555;">(習得済: ${(m.passives||[]).join(', ') || 'なし'})</span>
+                </div>
             </div>
         `;
         listCont.appendChild(item);
@@ -192,13 +203,42 @@ function addParam(id, k) {
 
 function resetParams(id) {
     const m = monsters.find(m => m.id === id);
-    // 初期ポイントが5なので、現在のレベル+4ポイントが返ってくるように修正
-    if (m && confirm("リセットしますか？")) { m.points = m.level + 4; m.params = { power: 1, speed: 1, hp: 1, intel: 1 }; m.trait = null; saveAndRefresh(); }
+    if (m && confirm("リセットしますか？")) { m.points = m.level + 4; m.params = { power: 1, speed: 1, hp: 1, intel: 1 }; m.trait = null; m.passives = []; saveAndRefresh(); }
 }
 
 function changeTrait(id, v) {
     const m = monsters.find(m => m.id === id);
     if (v === "") { m.trait = null; } else if (m.points >= 5) { m.trait = v; m.points -= 5; } else { alert("5pt必要です"); }
+    saveAndRefresh();
+}
+
+function addPassive(id) {
+    const m = monsters.find(m => m.id === id);
+    if (!m) return;
+    if (!m.passives) m.passives = [];
+    
+    if (m.passives.length >= 2) {
+        alert("パッシブは2つまでです");
+        return;
+    }
+    
+    const sel = document.getElementById(`passive-select-${id}`);
+    const val = sel.value;
+    
+    if (m.passives.includes(val)) {
+        alert("既に習得しています");
+        return;
+    }
+    
+    const cost = m.passives.length === 0 ? 15 : 30;
+    if (m.points < cost) {
+        alert(`${cost}pt必要です`);
+        return;
+    }
+    
+    m.points -= cost;
+    m.passives.push(val);
+    if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); }
     saveAndRefresh();
 }
 
@@ -227,7 +267,6 @@ function animateMonster(el) {
     requestAnimationFrame(step);
 }
 
-// --- データリセット ---
 function resetData() {
     if (confirm("すべてのデータを削除して最初からやり直しますか？")) {
         localStorage.clear();
@@ -235,7 +274,6 @@ function resetData() {
     }
 }
 
-// --- バトルシステム ---
 let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
 let battleSpeed = 1;
 
@@ -273,7 +311,7 @@ function setupBattle() {
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: m.name || '仲間', state: null }));
+    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: m.name || '仲間', state: null, passives: m.passives || [], breakCharge: false }));
     enemyParty = [];
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
@@ -283,7 +321,8 @@ function setupBattle() {
             id: Math.random(), image: imgName, name: imgName.replace('.png', ''), 
             params: { power: enemyLv * mult, speed: enemyLv * mult, hp: enemyLv * mult, intel: 0 }, 
             curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss,
-            state: null, trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)]
+            state: null, trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)],
+            passives: [], breakCharge: false
         });
     }
     battleActive = true; renderBattleUnits(); runTurn();
@@ -302,6 +341,26 @@ async function runTurn() {
             }
             if (u.state === 'マヒ' && Math.random() < 0.25) { addLog(`${u.name}は体が痺れて動けない！`); continue; }
 
+            if (u.passives && u.passives.includes('自己再生') && u.curHp < u.maxHp) {
+                let heal = Math.floor(u.maxHp * 0.1);
+                if (heal < 1) heal = 1;
+                u.curHp = Math.min(u.maxHp, u.curHp + heal);
+                addLog(`${u.name}は自己再生で${heal}回復！`);
+                renderBattleUnits();
+            }
+
+            let dmgMult = 1;
+            if (u.passives && u.passives.includes('限界突破')) {
+                if (!u.breakCharge) {
+                    u.breakCharge = true;
+                    addLog(`${u.name}は限界突破の力を溜めている！`);
+                    continue;
+                } else {
+                    u.breakCharge = false;
+                    dmgMult = 2.5;
+                }
+            }
+
             let targets = (u.side === 'p' ? enemyParty : playerParty).filter(t => t.curHp > 0);
             if (u.state === '混乱') targets = [...playerParty, ...enemyParty].filter(t => t.curHp > 0);
             if (targets.length === 0) break;
@@ -319,36 +378,87 @@ async function runTurn() {
                     animatedTargets.push(target);
                 }
             } else {
-                let target = targets[Math.floor(Math.random() * targets.length)];
-                let evadeProb = Math.max(0, target.params.speed - u.params.speed);
+                let isAllAttack = (u.passives && u.passives.includes('全体攻撃') && Math.random() < 0.5);
                 animatedAttacker = u;
-                
-                if (Math.random() * 100 < evadeProb) {
-                    addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
-                } else {
-                    let dmg = u.params.power;
-                    let isCrit = Math.random() * 100 < (u.params.intel || 0);
-                    if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
-                    else { addLog(`${u.name}の攻撃！`); }
 
-                    target.curHp -= dmg;
-                    addLog(`${target.name}に${dmg}ダメ`);
-                    animatedTargets.push(target);
+                if (isAllAttack) {
+                    addLog(`${u.name}の全体攻撃！`);
+                    for (let target of targets) {
+                        let evadeProb = Math.max(0, target.params.speed - u.params.speed);
+                        if (Math.random() * 100 < evadeProb) {
+                            addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
+                        } else {
+                            let dmg = u.params.power;
+                            let isCrit = Math.random() * 100 < (u.params.intel || 0);
+                            if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b>`); }
+                            
+                            dmg = Math.floor(dmg * dmgMult);
+                            target.curHp -= dmg;
+                            addLog(`${target.name}に${dmg}ダメ`);
+                            animatedTargets.push(target);
 
-                    if (u.trait && !target.isBoss) {
-                        if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
-                        if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
-                        if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
-                        if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                            if (u.trait && !target.isBoss) {
+                                if (target.passives && target.passives.includes('状態異常無効') && Math.random() < 0.5) {
+                                    addLog(`${target.name}は状態異常を無効化した！`);
+                                } else {
+                                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                                    if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
+                                    if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
+                                    if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                                }
+                            }
+                            if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+                        }
                     }
-                    if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+                } else {
+                    let target = targets[Math.floor(Math.random() * targets.length)];
+                    
+                    let kabauUnit = targets.find(t => t.passives && t.passives.includes('庇う') && t.id !== target.id);
+                    if (kabauUnit && Math.random() < 0.7) {
+                        addLog(`${kabauUnit.name}が${target.name}を庇った！`);
+                        target = kabauUnit;
+                    }
+
+                    let atkCount = 1;
+                    if (u.passives && u.passives.includes('連続攻撃') && u.params.speed >= target.params.speed * 1.5) {
+                        atkCount = 2;
+                    }
+
+                    for (let i = 0; i < atkCount; i++) {
+                        if (target.curHp <= 0) break;
+                        
+                        let evadeProb = Math.max(0, target.params.speed - u.params.speed);
+                        if (Math.random() * 100 < evadeProb) {
+                            addLog(`${u.name}の攻撃！ ...${target.name}は回避した！`);
+                        } else {
+                            let dmg = u.params.power;
+                            let isCrit = Math.random() * 100 < (u.params.intel || 0);
+                            if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
+                            else { addLog(`${u.name}の攻撃！`); }
+
+                            dmg = Math.floor(dmg * dmgMult);
+                            target.curHp -= dmg;
+                            addLog(`${target.name}に${dmg}ダメ`);
+                            if (!animatedTargets.includes(target)) animatedTargets.push(target);
+
+                            if (u.trait && !target.isBoss) {
+                                if (target.passives && target.passives.includes('状態異常無効') && Math.random() < 0.5) {
+                                    addLog(`${target.name}は状態異常を無効化した！`);
+                                } else {
+                                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                                    if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
+                                    if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
+                                    if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
+                                }
+                            }
+                            if (target.state === '眠り' && Math.random() < 0.5) { target.state = null; addLog(`衝撃で${target.name}の目が覚めた！`); }
+                        }
+                    }
                 }
             }
             
-            // アニメーションを正常に動かすために先にDOMを更新する
             renderBattleUnits();
             
-            // DOM更新直後にアニメーションクラスを付与する
             if (animatedAttacker) {
                 playBattleAnimation(animatedAttacker, null);
             }
@@ -404,7 +514,7 @@ function playBattleAnimation(attacker, target) {
         const atkEl = document.getElementById('unit-' + String(attacker.id).replace('.',''));
         if (atkEl) {
             atkEl.classList.remove('anim-attack');
-            void atkEl.offsetWidth; // アニメーションを確実に再起動するためのリフロー
+            void atkEl.offsetWidth;
             atkEl.classList.add('anim-attack');
         }
     }
@@ -413,13 +523,12 @@ function playBattleAnimation(attacker, target) {
         if (tgtEl) {
             const kbClass = (target.side === 'p') ? 'anim-damage-p' : 'anim-damage-e';
             tgtEl.classList.remove('anim-damage-p', 'anim-damage-e');
-            void tgtEl.offsetWidth; // アニメーションを確実に再起動するためのリフロー
+            void tgtEl.offsetWidth;
             tgtEl.classList.add(kbClass);
         }
     }
 }
 
-// --- オーディオ設定 ---
 window.gameAudio = { field: new Audio('so_sweet.mp3'), battle: new Audio('Quick_pipes.mp3'), boss: new Audio('Battle_in_the_Moonlight.mp3'), sePoint: new Audio('point.mp3') };
 let volBGM = 0.08, volSE = 0.5;
 const allBGM = [window.gameAudio.field, window.gameAudio.battle, window.gameAudio.boss];
