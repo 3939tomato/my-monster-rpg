@@ -23,7 +23,7 @@ window.onload = () => {
         monsters = JSON.parse(saved);
     }
     renderMonsterList();
-    spawnMonstersInField(); // 草原にモンスターを表示
+    spawnMonstersInField(); 
     initCanvas();
     resetView();
     setupCanvasEvents();
@@ -193,13 +193,23 @@ function deleteMonster(id) { if(confirm("削除しますか？")) { monsters = m
 function saveAndRefresh() { localStorage.setItem('dot_monsters', JSON.stringify(monsters)); renderMonsterList(); }
 function editMonster(id) { editingMonsterId = id; const m = monsters.find(m => m.id === id); currentGridSize = m.size; initCanvas(); const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = m.image; closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 function createNewMonster() { editingMonsterId = null; initCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height); closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
-function goToField() { document.getElementById('editor-view').style.display='none'; document.getElementById('field-view').style.display='block'; }
-function goToEditor() { document.getElementById('field-view').style.display='none'; document.getElementById('editor-view').style.display='flex'; }
+
+function goToField() { 
+    document.getElementById('editor-view').style.display='none'; 
+    document.getElementById('field-view').style.display='block'; 
+    updateGameMusic(); 
+}
+function goToEditor() { 
+    document.getElementById('field-view').style.display='none'; 
+    document.getElementById('editor-view').style.display='flex'; 
+    updateGameMusic();
+}
 function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display='flex'; }
 function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
 
 function spawnMonstersInField() {
     const area = document.getElementById('monster-field-area'); 
+    if (!area) return;
     area.innerHTML = '';
     monsters.forEach(m => {
         const img = document.createElement('img'); img.src = m.image; img.className = 'monster';
@@ -223,6 +233,7 @@ function startDungeon() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
     currentFloor = 1; document.getElementById('battle-screen').style.display = 'block'; setupBattle();
+    updateGameMusic();
 }
 
 function setupBattle() {
@@ -240,7 +251,7 @@ function setupBattle() {
         enemyParty.push({ 
             id: Math.random(), 
             image: imgName, 
-            name: imgName.replace('.png', ''), // 名前を表示用にセット
+            name: imgName.replace('.png', ''), 
             params: { power: enemyLv, speed: enemyLv, hp: enemyLv }, 
             curHp: enemyLv * 10, maxHp: enemyLv * 10, side: 'e', isBoss: isBoss 
         });
@@ -281,8 +292,8 @@ function checkEnd() {
     return false;
 }
 
-function nextFloor() { currentFloor++; setupBattle(); }
-function exitDungeon() { battleActive = false; document.getElementById('battle-screen').style.display = 'none'; }
+function nextFloor() { currentFloor++; setupBattle(); updateGameMusic(); }
+function exitDungeon() { battleActive = false; document.getElementById('battle-screen').style.display = 'none'; updateGameMusic(); }
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
 function renderBattleUnits() {
@@ -314,17 +325,32 @@ document.getElementById('settings-btn').onclick = () => document.getElementById(
 document.getElementById('bgm-slider').oninput = (e) => { volBGM = e.target.value; allBGM.forEach(s => s.volume = volBGM); };
 document.getElementById('se-slider').oninput = (e) => { volSE = e.target.value; window.gameAudio.sePoint.volume = volSE; };
 
+// BGM管理ロジックの修正
 function updateGameMusic() {
     allBGM.forEach(s => s.pause());
-    if (document.getElementById('editor-view').style.display !== 'none') return;
-    if (document.getElementById('battle-screen').style.display !== 'none') {
+    
+    // 現在どの画面が表示されているかをチェック
+    const editorVisible = document.getElementById('editor-view').style.display === 'flex';
+    const battleVisible = document.getElementById('battle-screen').style.display === 'block';
+
+    if (editorVisible) {
+        // お絵描き中は無音
+        return;
+    }
+
+    if (battleVisible) {
         if (currentFloor % 10 === 0) window.gameAudio.boss.play().catch(()=>{});
         else window.gameAudio.battle.play().catch(()=>{});
     } else {
+        // 草原画面（デフォルト）
         window.gameAudio.field.play().catch(()=>{});
     }
 }
-document.addEventListener('click', () => setTimeout(updateGameMusic, 100));
+
+// 最初のクリックで確実にBGMをスタートさせる
+document.addEventListener('click', () => {
+    updateGameMusic();
+}, { once: false });
 
 window.playHitAnimation = () => {
     const el = document.getElementById('battle-area');
