@@ -38,7 +38,7 @@
         #zoom-panel { bottom: 20px; right: 20px; flex-direction: column; }
         #status-display { position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.5); color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 90;}
 
-        /* --- 草原（シンプルな芝生デザインに修正） --- */
+        /* --- 草原（シンプルな芝生デザイン） --- */
         #field-view { 
             width: 100%; height: 100%; position: relative; overflow: hidden; 
             background-color: #8dbd5d; 
@@ -76,8 +76,12 @@
             overflow-y: scroll; border: 1px solid #888; border-radius: 5px; z-index: 2100;
         }
         #battle-controls {
-            position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 2100;
+            position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 2100;
         }
+
+        /* --- 階層選択モーダル --- */
+        #floor-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 4000; align-items: center; justify-content: center; }
+        #floor-content { background: #333; color: white; padding: 30px; border: 4px solid #fff; border-radius: 15px; text-align: center; }
 
         #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; align-items: center; justify-content: center; }
     </style>
@@ -106,8 +110,18 @@
 
     <div id="field-view">
         <button id="btn-to-book" onclick="openBookModal()">📖 モンスター図鑑</button>
-        <button onclick="startDungeon()" style="position:absolute; bottom:20px; left:20px; background:maroon; color:white; padding:15px; border-radius:10px; z-index:100;">⚔️ ダンジョンへ</button>
+        <button onclick="openFloorSelect()" style="position:absolute; bottom:20px; left:20px; background:maroon; color:white; padding:15px; border-radius:10px; z-index:100;">⚔️ ダンジョン探索</button>
         <div id="monster-field-area"></div>
+    </div>
+
+    <div id="floor-modal">
+        <div id="floor-content">
+            <h3>探索階層の選択</h3>
+            <p>開始する階を選んでください：</p>
+            <select id="floor-select-dropdown" style="padding: 10px; font-size: 18px; width: 150px; margin-bottom: 20px;"></select><br>
+            <button onclick="confirmFloorAndStart()" style="background: green; color: white; padding: 10px 30px;">出発</button>
+            <button onclick="document.getElementById('floor-modal').style.display='none'" style="background: #555; color: white; padding: 10px 20px;">キャンセル</button>
+        </div>
     </div>
 
     <div id="book-modal">
@@ -128,6 +142,7 @@
             <div id="battle-unit-layer"></div>
         </div>
         <div id="battle-controls">
+            <button id="btn-speed-toggle" style="background:#444; color:white; width: 80px;" onclick="toggleBattleSpeed()">倍速:1x</button>
             <button id="btn-next-floor" style="display:none; background:green; color:white; padding:10px 20px;" onclick="nextFloor()">次の階へ</button>
             <button style="background:#222; color:white; padding:10px 20px;" onclick="exitDungeon()">撤退</button>
         </div>
