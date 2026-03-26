@@ -166,7 +166,17 @@ function getTotalStats(m) {
 }
 
 function renderEquipSelect(m, slotIndex) {
-    let html = `<select onchange="changeEquip(${m.id}, ${slotIndex}, this.value)" style="font-size:11px;">
+    let currentRing = null;
+    if (m.equips && m.equips[slotIndex]) {
+        currentRing = inventory.find(r => r.id === m.equips[slotIndex]);
+    }
+    let imgHtml = '';
+    if (currentRing) {
+        let fileName = {power:'力の指輪.png', speed:'速度の指輪.png', hp:'体力の指輪.png', intel:'知力の指輪.png'}[currentRing.type];
+        imgHtml = `<img src="${fileName}" style="width:16px; height:16px; vertical-align:middle; image-rendering:pixelated; margin-right:4px;">`;
+    }
+
+    let html = `${imgHtml}<select onchange="changeEquip(${m.id}, ${slotIndex}, this.value)" style="font-size:11px; vertical-align:middle;">
         <option value="">なし</option>`;
     inventory.forEach(ring => {
         let equippedByOther = monsters.find(mon => mon.id !== m.id && mon.equips && mon.equips.includes(ring.id));
