@@ -1,4 +1,5 @@
 let monsters = [];
+let inventory = [];
 let editingMonsterId = null;
 const MAX_MONSTERS = 5; 
 const MAX_PARTY = 3;    
@@ -23,7 +24,16 @@ window.onload = () => {
     const saved = localStorage.getItem('dot_monsters');
     if (saved) {
         monsters = JSON.parse(saved);
+        monsters.forEach(m => {
+            if (!m.equips) m.equips = [null, null];
+            if (m.extraSlotUnlocked === undefined) m.extraSlotUnlocked = false;
+        });
     }
+    const savedInv = localStorage.getItem('dot_inventory');
+    if (savedInv) {
+        inventory = JSON.parse(savedInv);
+    }
+
     renderMonsterList();
     spawnMonstersInField(); 
     initCanvas();
@@ -127,12 +137,66 @@ document.getElementById('btn-save-monster').onclick = () => {
         if (m) { m.image = dataUrl; m.size = currentGridSize; }
     } else {
         if (monsters.length >= MAX_MONSTERS) return alert("上限です");
-        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 5, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, passives: [], inParty: false });
+        monsters.push({ id: Date.now(), name: 'ななし', image: dataUrl, size: currentGridSize, level: 1, points: 5, params: { power: 1, speed: 1, hp: 1, intel: 1 }, trait: null, passives: [], inParty: false, equips: [null, null], extraSlotUnlocked: false });
     }
     saveAndRefresh();
     spawnMonstersInField();
     goToField();
 };
+
+function getEquipStats(m) {
+    let b = { power: 0, speed: 0, hp: 0, intel: 0 };
+    if (!m.equips) return b;
+    m.equips.forEach(ringId => {
+        if (!ringId) return;
+        const ring = inventory.find(r => r.id === ringId);
+        if (ring) b[ring.type] += ring.val;
+    });
+    return b;
+}
+
+function getTotalStats(m) {
+    let b = getEquipStats(m);
+    return {
+        power: m.params.power + b.power,
+        speed: m.params.speed + b.speed,
+        hp: m.params.hp + b.hp,
+        intel: m.params.intel + b.intel
+    };
+}
+
+function renderEquipSelect(m, slotIndex) {
+    let html = `<select onchange="changeEquip(${m.id}, ${slotIndex}, this.value)" style="font-size:11px;">
+        <option value="">なし</option>`;
+    inventory.forEach(ring => {
+        let equippedByOther = monsters.find(mon => mon.id !== m.id && mon.equips && mon.equips.includes(ring.id));
+        if (equippedByOther) return;
+        if (m.equips[1 - slotIndex] === ring.id) return;
+        let typeName = {power:'力', speed:'速度', hp:'体力', intel:'知力'}[ring.type] + 'の指輪';
+        let selected = m.equips[slotIndex] === ring.id ? 'selected' : '';
+        html += `<option value="${ring.id}" ${selected}>${typeName}(+${ring.val})</option>`;
+    });
+    html += `</select>`;
+    return html;
+}
+
+function changeEquip(mId, slotIndex, ringIdStr) {
+    const m = monsters.find(m => m.id === mId);
+    if (!m) return;
+    if (!m.equips) m.equips = [null, null];
+    m.equips[slotIndex] = ringIdStr ? parseFloat(ringIdStr) : null;
+    saveAndRefresh();
+}
+
+function unlockExtraSlot(mId) {
+    const m = monsters.find(m => m.id === mId);
+    if (!m) return;
+    if (m.points < 50) return alert("50pt必要です");
+    m.points -= 50;
+    m.extraSlotUnlocked = true;
+    if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); }
+    saveAndRefresh();
+}
 
 function renderMonsterList() {
     const listCont = document.getElementById('monster-list');
@@ -141,6 +205,21 @@ function renderMonsterList() {
     document.getElementById('create-new-area').style.display = monsters.length >= MAX_MONSTERS ? 'none' : 'block';
 
     monsters.forEach((m, i) => {
+        if (!m.equips) m.equips = [null, null];
+
+        let stats = getTotalStats(m);
+        let bonus = getEquipStats(m);
+        const sStr = (b, bon) => bon > 0 ? `${b}<span style="color:#4a90e2;font-size:10px;">(+${bon})</span>` : `${b}`;
+
+        let equipHtml = `装備1: ${renderEquipSelect(m, 0)}`;
+        if (m.extraSlotUnlocked) {
+            equipHtml += ` | 装備2: ${renderEquipSelect(m, 1)}`;
+        } else {
+            if (stats.power > 100 && stats.speed > 100 && stats.hp > 100 && stats.intel > 100) {
+                equipHtml += ` <button onclick="unlockExtraSlot(${m.id})" style="background:#4a90e2; color:white; border:none; border-radius:3px; font-size:10px; padding:4px;">枠追加(50pt)</button>`;
+            }
+        }
+
         const item = document.createElement('div');
         item.className = 'book-item';
         if (m.inParty) item.style.borderColor = '#4a90e2';
@@ -157,10 +236,10 @@ function renderMonsterList() {
                 <button onclick="deleteMonster(${m.id})" style="background:#ff6b6b; color:white;">別れ</button>
             </div>
             <div style="margin-top:10px; font-size:12px; background:#eee; padding:5px;">
-                攻: ${m.params.power} <button onclick="addParam(${m.id},'power')">＋</button> | 
-                速: ${m.params.speed} <button onclick="addParam(${m.id},'speed')">＋</button> | 
-                体: ${m.params.hp} <button onclick="addParam(${m.id},'hp')">＋</button> | 
-                知: ${m.params.intel} <button onclick="addParam(${m.id},'intel')">＋</button>
+                攻: ${sStr(m.params.power, bonus.power)} <button onclick="addParam(${m.id},'power')">＋</button> | 
+                速: ${sStr(m.params.speed, bonus.speed)} <button onclick="addParam(${m.id},'speed')">＋</button> | 
+                体: ${sStr(m.params.hp, bonus.hp)} <button onclick="addParam(${m.id},'hp')">＋</button> | 
+                知: ${sStr(m.params.intel, bonus.intel)} <button onclick="addParam(${m.id},'intel')">＋</button>
                 <div style="margin-top:5px;">特性: <select onchange="changeTrait(${m.id},this.value)">
                     <option value="">なし</option><option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
                     <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option><option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
@@ -178,6 +257,9 @@ function renderMonsterList() {
                     </select>
                     <button onclick="addPassive(${m.id})">習得</button>
                     <span style="font-size:11px; color:#555;">(習得済: ${(m.passives||[]).join(', ') || 'なし'})</span>
+                </div>
+                <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ccc;">
+                    ${equipHtml}
                 </div>
             </div>
         `;
@@ -243,7 +325,11 @@ function addPassive(id) {
 }
 
 function deleteMonster(id) { if(confirm("削除しますか？")) { monsters = monsters.filter(m => m.id !== id); saveAndRefresh(); spawnMonstersInField(); } }
-function saveAndRefresh() { localStorage.setItem('dot_monsters', JSON.stringify(monsters)); renderMonsterList(); }
+function saveAndRefresh() { 
+    localStorage.setItem('dot_monsters', JSON.stringify(monsters)); 
+    localStorage.setItem('dot_inventory', JSON.stringify(inventory));
+    renderMonsterList(); 
+}
 function editMonster(id) { editingMonsterId = id; const m = monsters.find(m => m.id === id); currentGridSize = m.size; initCanvas(); const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = m.image; closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 function createNewMonster() { editingMonsterId = null; initCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height); closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 
@@ -281,10 +367,15 @@ function openFloorSelect() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
     const select = document.getElementById('floor-select-dropdown'); select.innerHTML = '';
-    for (let i = 1; i <= Math.max(1, maxClearedFloor); i++) {
-        const opt = document.createElement('option'); opt.value = i; opt.textContent = `${i} 階`; select.appendChild(opt);
+    
+    let maxAvailable = Math.min(100, Math.max(1, maxClearedFloor + 1));
+    for (let i = 1; i <= maxAvailable; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i === maxAvailable && i > maxClearedFloor ? `${i} 階 (最新)` : `${i} 階`;
+        select.appendChild(opt);
     }
-    const nextOpt = document.createElement('option'); nextOpt.value = Math.max(1, maxClearedFloor + 1); nextOpt.textContent = `${nextOpt.value} 階 (最新)`; select.appendChild(nextOpt); select.value = nextOpt.value;
+    select.value = maxAvailable;
     document.getElementById('floor-modal').style.display = 'flex';
 }
 
@@ -311,7 +402,21 @@ function setupBattle() {
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
-    playerParty = monsters.filter(m => m.inParty).map(m => ({ ...m, curHp: m.params.hp * 10, maxHp: m.params.hp * 10, side: 'p', name: m.name || '仲間', state: null, passives: m.passives || [], breakCharge: false }));
+    playerParty = monsters.filter(m => m.inParty).map(m => {
+        let t = getTotalStats(m);
+        return {
+            ...m, 
+            params: t, 
+            curHp: t.hp * 10, 
+            maxHp: t.hp * 10, 
+            side: 'p', 
+            name: m.name || '仲間', 
+            state: null, 
+            passives: m.passives || [], 
+            breakCharge: false 
+        };
+    });
+    
     enemyParty = [];
     const count = isBoss ? 1 : 3;
     for (let i = 0; i < count; i++) {
@@ -474,9 +579,28 @@ async function runTurn() {
 function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
         battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
+        
+        if (currentFloor % 10 === 0 && Math.random() < 0.05) {
+            const types = ['power', 'speed', 'hp', 'intel'];
+            const t = types[Math.floor(Math.random() * types.length)];
+            const ring = { id: Date.now() + Math.random(), type: t, val: currentFloor };
+            inventory.push(ring);
+            localStorage.setItem('dot_inventory', JSON.stringify(inventory));
+            let typeName = {power:'力の指輪', speed:'速度の指輪', hp:'体力の指輪', intel:'知力の指輪'}[t];
+            addLog(`<b style="color:yellow;">${typeName}(+${currentFloor})をドロップした！</b>`);
+        }
+
         if (currentFloor > maxClearedFloor) { maxClearedFloor = currentFloor; localStorage.setItem('dot_max_cleared', maxClearedFloor); }
         monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
-        saveAndRefresh(); document.getElementById('btn-next-floor').style.display = 'block'; return true;
+        saveAndRefresh(); 
+
+        if (currentFloor >= 100) {
+            document.getElementById('clear-modal').style.display = 'flex';
+            document.getElementById('btn-next-floor').style.display = 'none';
+        } else {
+            document.getElementById('btn-next-floor').style.display = 'block'; 
+        }
+        return true;
     }
     if (playerParty.every(p => p.curHp <= 0)) { battleActive = false; addLog("全滅..."); return true; }
     return false;
