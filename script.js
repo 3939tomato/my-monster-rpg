@@ -362,25 +362,54 @@ function resetData() {
 
 let currentFloor = 1, battleActive = false, playerParty = [], enemyParty = [];
 let battleSpeed = 1;
+let isBossRushMode = false;
 
 function openFloorSelect() {
     const party = monsters.filter(m => m.inParty);
     if (party.length === 0) return alert("パーティを選んでください（最大3体）");
-    const select = document.getElementById('floor-select-dropdown'); select.innerHTML = '';
     
-    let maxAvailable = Math.min(100, Math.max(1, maxClearedFloor + 1));
-    for (let i = 1; i <= maxAvailable; i++) {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = i === maxAvailable && i > maxClearedFloor ? `${i} 階 (最新)` : `${i} 階`;
-        select.appendChild(opt);
-    }
-    select.value = maxAvailable;
+    const checkbox = document.getElementById('boss-mode-checkbox');
+    if(checkbox) checkbox.checked = false;
+    
+    updateFloorDropdown();
     document.getElementById('floor-modal').style.display = 'flex';
 }
 
+function updateFloorDropdown() {
+    const select = document.getElementById('floor-select-dropdown'); 
+    select.innerHTML = '';
+    let maxAvailable = Math.min(100, Math.max(1, maxClearedFloor + 1));
+    let bossMode = document.getElementById('boss-mode-checkbox') ? document.getElementById('boss-mode-checkbox').checked : false;
+
+    if (bossMode) {
+        for (let i = 10; i <= maxAvailable; i += 10) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `${i} 階 (BOSS)`;
+            select.appendChild(opt);
+        }
+        if (select.options.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = "";
+            opt.textContent = "選択可能ボスなし";
+            select.appendChild(opt);
+        }
+    } else {
+        for (let i = 1; i <= maxAvailable; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = i === maxAvailable && i > maxClearedFloor ? `${i} 階 (最新)` : `${i} 階`;
+            select.appendChild(opt);
+        }
+        select.value = maxAvailable;
+    }
+}
+
 function confirmFloorAndStart() {
-    currentFloor = parseInt(document.getElementById('floor-select-dropdown').value);
+    const val = document.getElementById('floor-select-dropdown').value;
+    if (!val) return alert("選択できる階層がありません");
+    currentFloor = parseInt(val);
+    isBossRushMode = document.getElementById('boss-mode-checkbox') ? document.getElementById('boss-mode-checkbox').checked : false;
     document.getElementById('floor-modal').style.display = 'none';
     startDungeon(currentFloor);
 }
@@ -594,8 +623,13 @@ function checkEnd() {
         monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
         saveAndRefresh(); 
 
+        let maxAvailable = Math.min(100, Math.max(1, maxClearedFloor + 1));
+        let nextFloorVal = isBossRushMode ? currentFloor + 10 : currentFloor + 1;
+
         if (currentFloor >= 100) {
             document.getElementById('clear-modal').style.display = 'flex';
+            document.getElementById('btn-next-floor').style.display = 'none';
+        } else if (nextFloorVal > maxAvailable) {
             document.getElementById('btn-next-floor').style.display = 'none';
         } else {
             document.getElementById('btn-next-floor').style.display = 'block'; 
@@ -606,7 +640,12 @@ function checkEnd() {
     return false;
 }
 
-function nextFloor() { currentFloor++; setupBattle(); updateGameMusic(); }
+function nextFloor() { 
+    currentFloor = isBossRushMode ? currentFloor + 10 : currentFloor + 1;
+    setupBattle(); 
+    updateGameMusic(); 
+}
+
 function exitDungeon() { battleActive = false; document.getElementById('battle-screen').style.display = 'none'; updateGameMusic(); }
 function addLog(m) { const l = document.getElementById('battle-log'); l.innerHTML += `<div>${m}</div>`; l.scrollTop = l.scrollHeight; }
 
