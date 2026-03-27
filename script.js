@@ -402,23 +402,28 @@ function updateFloorDropdown() {
     let bossMode = document.getElementById('boss-mode-checkbox') ? document.getElementById('boss-mode-checkbox').checked : false;
 
     if (bossMode) {
+        let lastAdded = "";
         for (let i = 10; i <= maxAvailable; i += 10) {
             const opt = document.createElement('option');
             opt.value = i;
             opt.textContent = `${i} 階 (BOSS)`;
             select.appendChild(opt);
+            lastAdded = i;
         }
         if (maxClearedFloor >= 100) {
             const opt = document.createElement('option');
             opt.value = 101;
-            opt.textContent = `EXステージ (神竜×3)`;
+            opt.textContent = `エクストラステージ (ドラゴン×3)`;
             select.appendChild(opt);
+            lastAdded = 101;
         }
         if (select.options.length === 0) {
             const opt = document.createElement('option');
             opt.value = "";
             opt.textContent = "選択可能ボスなし";
             select.appendChild(opt);
+        } else {
+            select.value = lastAdded;
         }
     } else {
         for (let i = 1; i <= maxAvailable; i++) {
@@ -430,10 +435,12 @@ function updateFloorDropdown() {
         if (maxClearedFloor >= 100) {
             const opt = document.createElement('option');
             opt.value = 101;
-            opt.textContent = `EXステージ (神竜×3)`;
+            opt.textContent = `エクストラステージ (ドラゴン×3)`;
             select.appendChild(opt);
+            select.value = 101;
+        } else {
+            select.value = maxAvailable;
         }
-        select.value = maxAvailable;
     }
 }
 
@@ -460,7 +467,7 @@ function setupBattle() {
     const isEX = (currentFloor === 101);
     const isBoss = (currentFloor % 10 === 0 && currentFloor <= 100);
     const enemyLv = isEX ? 150 : (isBoss ? Math.floor(currentFloor * 1.5) : currentFloor);
-    document.getElementById('floor-indicator').textContent = isEX ? `EXステージ` : `${currentFloor}階 ${isBoss ? '[BOSS]' : ''}`;
+    document.getElementById('floor-indicator').textContent = isEX ? `エクストラステージ` : `${currentFloor}階 ${isBoss ? '[BOSS]' : ''}`;
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
@@ -673,7 +680,7 @@ function checkEnd() {
         let nextFloorVal = isBossRushMode ? currentFloor + 10 : currentFloor + 1;
 
         if (currentFloor === 101) {
-            addLog(`<b style="color:gold;">EXステージ完全制覇！おめでとう！</b>`);
+            addLog(`<b style="color:gold;">エクストラステージ完全制覇！おめでとう！</b>`);
             document.getElementById('btn-next-floor').style.display = 'none';
         } else if (currentFloor === 100) {
             document.getElementById('clear-modal').style.display = 'flex';
