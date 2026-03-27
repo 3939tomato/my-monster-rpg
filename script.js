@@ -246,10 +246,10 @@ function renderMonsterList() {
                 <button onclick="deleteMonster(${m.id})" style="background:#ff6b6b; color:white;">別れ</button>
             </div>
             <div style="margin-top:10px; font-size:12px; background:#eee; padding:5px;">
-                攻: ${sStr(m.params.power, bonus.power)} <button onclick="addParam(${m.id},'power')">＋</button> | 
-                速: ${sStr(m.params.speed, bonus.speed)} <button onclick="addParam(${m.id},'speed')">＋</button> | 
-                体: ${sStr(m.params.hp, bonus.hp)} <button onclick="addParam(${m.id},'hp')">＋</button> | 
-                知: ${sStr(m.params.intel, bonus.intel)} <button onclick="addParam(${m.id},'intel')">＋</button>
+                攻: ${sStr(m.params.power, bonus.power)} <button onclick="addParam(${m.id},'power')">＋</button><button onclick="addAllParam(${m.id},'power')" style="font-size:10px; padding:2px 4px;">全</button> | 
+                速: ${sStr(m.params.speed, bonus.speed)} <button onclick="addParam(${m.id},'speed')">＋</button><button onclick="addAllParam(${m.id},'speed')" style="font-size:10px; padding:2px 4px;">全</button> | 
+                体: ${sStr(m.params.hp, bonus.hp)} <button onclick="addParam(${m.id},'hp')">＋</button><button onclick="addAllParam(${m.id},'hp')" style="font-size:10px; padding:2px 4px;">全</button> | 
+                知: ${sStr(m.params.intel, bonus.intel)} <button onclick="addParam(${m.id},'intel')">＋</button><button onclick="addAllParam(${m.id},'intel')" style="font-size:10px; padding:2px 4px;">全</button>
                 <div style="margin-top:5px;">特性: <select onchange="changeTrait(${m.id},this.value)">
                     <option value="">なし</option><option value="毒" ${m.trait==='毒'?'selected':''}>毒</option>
                     <option value="マヒ" ${m.trait==='マヒ'?'selected':''}>マヒ</option><option value="眠り" ${m.trait==='眠り'?'selected':''}>眠り</option>
@@ -291,6 +291,16 @@ function toggleParty(id) {
 function addParam(id, k) {
     const m = monsters.find(m => m.id === id);
     if (m && m.points > 0) { m.params[k]++; m.points--; if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); } saveAndRefresh(); }
+}
+
+function addAllParam(id, k) {
+    const m = monsters.find(m => m.id === id);
+    if (m && m.points > 0) {
+        m.params[k] += m.points;
+        m.points = 0;
+        if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); }
+        saveAndRefresh();
+    }
 }
 
 function resetParams(id) {
@@ -398,6 +408,12 @@ function updateFloorDropdown() {
             opt.textContent = `${i} 階 (BOSS)`;
             select.appendChild(opt);
         }
+        if (maxClearedFloor >= 100) {
+            const opt = document.createElement('option');
+            opt.value = 101;
+            opt.textContent = `EXステージ (神竜×3)`;
+            select.appendChild(opt);
+        }
         if (select.options.length === 0) {
             const opt = document.createElement('option');
             opt.value = "";
@@ -409,6 +425,12 @@ function updateFloorDropdown() {
             const opt = document.createElement('option');
             opt.value = i;
             opt.textContent = i === maxAvailable && i > maxClearedFloor ? `${i} 階 (最新)` : `${i} 階`;
+            select.appendChild(opt);
+        }
+        if (maxClearedFloor >= 100) {
+            const opt = document.createElement('option');
+            opt.value = 101;
+            opt.textContent = `EXステージ (神竜×3)`;
             select.appendChild(opt);
         }
         select.value = maxAvailable;
@@ -435,9 +457,10 @@ function toggleBattleSpeed() {
 }
 
 function setupBattle() {
-    const isBoss = (currentFloor % 10 === 0);
-    const enemyLv = isBoss ? Math.floor(currentFloor * 1.5) : currentFloor;
-    document.getElementById('floor-indicator').textContent = `${currentFloor}階 ${isBoss ? '[BOSS]' : ''}`;
+    const isEX = (currentFloor === 101);
+    const isBoss = (currentFloor % 10 === 0 && currentFloor <= 100);
+    const enemyLv = isEX ? 150 : (isBoss ? Math.floor(currentFloor * 1.5) : currentFloor);
+    document.getElementById('floor-indicator').textContent = isEX ? `EXステージ` : `${currentFloor}階 ${isBoss ? '[BOSS]' : ''}`;
     document.getElementById('battle-log').innerHTML = '';
     document.getElementById('btn-next-floor').style.display = 'none';
 
@@ -457,15 +480,18 @@ function setupBattle() {
     });
     
     enemyParty = [];
-    const count = isBoss ? 1 : 3;
+    const count = isEX ? 3 : (isBoss ? 1 : 3);
     for (let i = 0; i < count; i++) {
-        const imgName = isBoss ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
-        const mult = isBoss ? 3 : 1; 
+        const imgName = (isBoss || isEX) ? BOSS_IMAGE : ENEMY_IMAGES[Math.floor(Math.random() * ENEMY_IMAGES.length)];
+        const mult = (isBoss || isEX) ? 3 : 1; 
+        let eName = imgName.replace('.png', '');
+        if (isEX) eName += ` ${['A','B','C'][i]}`;
+
         enemyParty.push({ 
-            id: Math.random(), image: imgName, name: imgName.replace('.png', ''), 
+            id: Math.random(), image: imgName, name: eName, 
             params: { power: enemyLv * mult, speed: enemyLv * mult, hp: enemyLv * mult, intel: 0 }, 
-            curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: isBoss,
-            state: null, trait: isBoss ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)],
+            curHp: (enemyLv * mult) * 10, maxHp: (enemyLv * mult) * 10, side: 'e', isBoss: (isBoss || isEX),
+            state: null, trait: (isBoss || isEX) ? null : ['毒', 'マヒ', '眠り', '混乱'][Math.floor(Math.random() * 4)],
             passives: [], breakCharge: false
         });
     }
@@ -545,7 +571,12 @@ async function runTurn() {
                                 if (target.passives && target.passives.includes('状態異常無効') && Math.random() < 0.5) {
                                     addLog(`${target.name}は状態異常を無効化した！`);
                                 } else {
-                                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                                    if (u.trait === '毒') { 
+                                        let pDmg = Math.floor(dmg * 0.3);
+                                        if(pDmg < 1) pDmg = 1;
+                                        target.curHp -= pDmg; 
+                                        addLog(`${target.name}に毒の追加ダメージ${pDmg}！`); 
+                                    }
                                     if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
                                     if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
                                     if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
@@ -589,7 +620,12 @@ async function runTurn() {
                                 if (target.passives && target.passives.includes('状態異常無効') && Math.random() < 0.5) {
                                     addLog(`${target.name}は状態異常を無効化した！`);
                                 } else {
-                                    if (u.trait === '毒') { target.curHp -= 2; addLog(`${target.name}は毒を受けた！`); }
+                                    if (u.trait === '毒') { 
+                                        let pDmg = Math.floor(dmg * 0.3);
+                                        if(pDmg < 1) pDmg = 1;
+                                        target.curHp -= pDmg; 
+                                        addLog(`${target.name}に毒の追加ダメージ${pDmg}！`); 
+                                    }
                                     if (u.trait === 'マヒ' && !target.state && Math.random() < 0.3) { target.state = 'マヒ'; addLog(`${target.name}をマヒさせた！`); }
                                     if (u.trait === '眠り' && !target.state && Math.random() < 0.2) { target.state = '眠り'; addLog(`${target.name}を眠らせた！`); }
                                     if (u.trait === '混乱' && !target.state && Math.random() < 0.3) { target.state = '混乱'; addLog(`${target.name}を混乱させた！`); }
@@ -629,14 +665,17 @@ function checkEnd() {
             addLog(`<b style="color:yellow;">${typeName}(+${currentFloor})をドロップした！</b>`);
         }
 
-        if (currentFloor > maxClearedFloor) { maxClearedFloor = currentFloor; localStorage.setItem('dot_max_cleared', maxClearedFloor); }
+        if (currentFloor > maxClearedFloor && currentFloor <= 100) { maxClearedFloor = currentFloor; localStorage.setItem('dot_max_cleared', maxClearedFloor); }
         monsters.forEach(m => { if(m.inParty) { m.level++; m.points++; } });
         saveAndRefresh(); 
 
         let maxAvailable = Math.min(100, Math.max(1, maxClearedFloor + 1));
         let nextFloorVal = isBossRushMode ? currentFloor + 10 : currentFloor + 1;
 
-        if (currentFloor >= 100) {
+        if (currentFloor === 101) {
+            addLog(`<b style="color:gold;">EXステージ完全制覇！おめでとう！</b>`);
+            document.getElementById('btn-next-floor').style.display = 'none';
+        } else if (currentFloor === 100) {
             document.getElementById('clear-modal').style.display = 'flex';
             document.getElementById('btn-next-floor').style.display = 'none';
         } else if (nextFloorVal > maxAvailable) {
@@ -717,7 +756,7 @@ function updateGameMusic() {
     const battleVisible = document.getElementById('battle-screen').style.display === 'block';
     if (editorVisible) return;
     if (battleVisible) {
-        if (currentFloor % 10 === 0) window.gameAudio.boss.play().catch(()=>{});
+        if (currentFloor % 10 === 0 || currentFloor === 101) window.gameAudio.boss.play().catch(()=>{});
         else window.gameAudio.battle.play().catch(()=>{});
     } else {
         window.gameAudio.field.play().catch(()=>{});
