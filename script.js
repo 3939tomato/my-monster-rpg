@@ -201,7 +201,15 @@ function changeEquip(mId, slotIndex, ringIdStr) {
 function unlockExtraSlot(mId) {
     const m = monsters.find(m => m.id === mId);
     if (!m) return;
-    if (m.points < 50) return alert("50pt必要です");
+    
+    let stats = getTotalStats(m);
+    if (stats.power < 100 || stats.speed < 100 || stats.hp < 100 || stats.intel < 100) {
+        return alert("パラメーターを全て100以上にしてください。");
+    }
+    if (m.points < 50) {
+        return alert("50ポイントを満たしていません。");
+    }
+    
     m.points -= 50;
     m.extraSlotUnlocked = true;
     if(window.gameAudio) { window.gameAudio.sePoint.currentTime=0; window.gameAudio.sePoint.play().catch(()=>{}); }
@@ -225,8 +233,11 @@ function renderMonsterList() {
         if (m.extraSlotUnlocked) {
             equipHtml += ` | 装備2: ${renderEquipSelect(m, 1)}`;
         } else {
-            if (stats.power > 100 && stats.speed > 100 && stats.hp > 100 && stats.intel > 100) {
-                equipHtml += ` <button onclick="unlockExtraSlot(${m.id})" style="background:#4a90e2; color:white; border:none; border-radius:3px; font-size:10px; padding:4px;">枠追加(50pt)</button>`;
+            equipHtml += ` <button onclick="unlockExtraSlot(${m.id})" style="background:#4a90e2; color:white; border:none; border-radius:3px; font-size:10px; padding:4px;">枠追加(50pt)</button>`;
+            if (!(stats.power >= 100 && stats.speed >= 100 && stats.hp >= 100 && stats.intel >= 100)) {
+                equipHtml += ` <span style="font-size:10px; color:#ff6b6b;">※パラメーターを全て100以上にしてください。</span>`;
+            } else if (m.points < 50) {
+                equipHtml += ` <span style="font-size:10px; color:#ff6b6b;">※50ポイントを満たしていません。</span>`;
             }
         }
 
@@ -353,8 +364,18 @@ function saveAndRefresh() {
 function editMonster(id) { editingMonsterId = id; const m = monsters.find(m => m.id === id); currentGridSize = m.size; initCanvas(); const img = new Image(); img.onload = () => ctx.drawImage(img, 0, 0); img.src = m.image; closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 function createNewMonster() { editingMonsterId = null; initCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height); closeBookModal(); goToEditor(); setTimeout(resetView, 100); }
 
-function goToField() { document.getElementById('editor-view').style.display='none'; document.getElementById('field-view').style.display='block'; updateGameMusic(); }
-function goToEditor() { document.getElementById('field-view').style.display='none'; document.getElementById('editor-view').style.display='flex'; updateGameMusic(); }
+function goToField() { 
+    document.getElementById('editor-view').style.display='none'; 
+    document.getElementById('field-view').style.display='block'; 
+    document.getElementById('settings-btn').style.display = 'block';
+    updateGameMusic(); 
+}
+function goToEditor() { 
+    document.getElementById('field-view').style.display='none'; 
+    document.getElementById('editor-view').style.display='flex'; 
+    document.getElementById('settings-btn').style.display = 'none';
+    updateGameMusic(); 
+}
 function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display='flex'; }
 function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
 
