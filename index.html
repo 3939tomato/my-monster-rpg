@@ -152,11 +152,22 @@
             <h3>SETTINGS</h3>
             BGM: <input type="range" id="bgm-slider" min="0" max="1" step="0.01" value="0.08"><br><br>
             SE: <input type="range" id="se-slider" min="0" max="1" step="0.01" value="0.5"><br><hr style="border:0.5px solid #555;">
+            <button onclick="showGameDescription()" style="background:#4a90e2; color:white; padding:10px 20px; font-weight:bold; margin-bottom:20px;">ゲームの説明</button><br>
             <button onclick="resetData()" style="background: maroon; color: white; margin-bottom: 10px; width: 100%;">データ全消去</button><br>
             <button onclick="document.getElementById('settings-modal').style.display='none'" style="width: 100%;">閉じる</button>
         </div>
     </div>
 
+    <div id="description-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:4000; justify-content:center; align-items:center;">
+        <div style="background:#333; color:white; padding:20px; border:3px solid #fff; border-radius:10px; width: 85%; max-width: 600px; max-height: 80vh; display:flex; flex-direction:column; text-align:left;">
+            <h3 style="text-align: center; margin-top: 0; color: #4a90e2;">ゲームの説明</h3>
+            <div id="readme-content" style="flex-grow: 1; overflow-y: auto; white-space: pre-wrap; font-size: 14px; line-height: 1.6; padding: 10px; background: #222; border-radius: 5px;">読み込み中...</div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="document.getElementById('description-modal').style.display='none'" style="background:#aaa; color:black; padding: 10px 30px; font-weight:bold;">閉じる</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="script.js"></script>
 </body>
 </html>
