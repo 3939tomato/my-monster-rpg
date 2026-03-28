@@ -588,7 +588,11 @@ async function runTurn() {
                         } else {
                             let dmg = u.params.power;
                             let isCrit = Math.random() * 100 < (u.params.intel || 0);
-                            if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b>`); }
+                            if (isCrit) { 
+                                let critMult = u.params.intel > 100 ? 2 + (u.params.intel - 100) * 0.01 : 2;
+                                dmg *= critMult; 
+                                addLog(`<b style="color:orange;">💥クリティカル！</b>`); 
+                            }
                             
                             dmg = Math.floor(dmg * dmgMult);
                             target.curHp -= dmg;
@@ -636,7 +640,11 @@ async function runTurn() {
                         } else {
                             let dmg = u.params.power;
                             let isCrit = Math.random() * 100 < (u.params.intel || 0);
-                            if (isCrit) { dmg *= 2; addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); }
+                            if (isCrit) { 
+                                let critMult = u.params.intel > 100 ? 2 + (u.params.intel - 100) * 0.01 : 2;
+                                dmg *= critMult; 
+                                addLog(`<b style="color:orange;">💥クリティカル！</b> ${u.name}の強撃！`); 
+                            }
                             else { addLog(`${u.name}の攻撃！`); }
 
                             dmg = Math.floor(dmg * dmgMult);
@@ -683,6 +691,8 @@ function checkEnd() {
     if (enemyParty.every(e => e.curHp <= 0)) {
         battleActive = false; addLog("勝利！全員LvUP & 1pt獲得！");
         
+        let wasFirstClear100 = (currentFloor === 100 && maxClearedFloor < 100);
+
         if (currentFloor % 10 === 0 && Math.random() < 0.05) {
             const types = ['power', 'speed', 'hp', 'intel'];
             const t = types[Math.floor(Math.random() * types.length)];
@@ -703,8 +713,10 @@ function checkEnd() {
         if (currentFloor === 101) {
             addLog(`<b style="color:gold;">エクストラステージ完全制覇！おめでとう！</b>`);
             document.getElementById('btn-next-floor').style.display = 'none';
-        } else if (currentFloor === 100) {
+        } else if (currentFloor === 100 && wasFirstClear100) {
             document.getElementById('clear-modal').style.display = 'flex';
+            document.getElementById('btn-next-floor').style.display = 'none';
+        } else if (currentFloor === 100) {
             document.getElementById('btn-next-floor').style.display = 'none';
         } else if (nextFloorVal > maxAvailable) {
             document.getElementById('btn-next-floor').style.display = 'none';
