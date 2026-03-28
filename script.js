@@ -803,3 +803,19 @@ function updateGameMusic() {
     }
 }
 document.addEventListener('click', () => { updateGameMusic(); }, { once: false });
+
+async function showGameDescription() {
+    const modal = document.getElementById('description-modal');
+    const content = document.getElementById('readme-content');
+    modal.style.display = 'flex';
+    
+    try {
+        const response = await fetch('README.md');
+        if (!response.ok) throw new Error('Network response was not ok');
+        const text = await response.text();
+        content.textContent = text;
+    } catch (error) {
+        content.textContent = "【エラー】README.mdの読み込みに失敗しました。\n\n※ファイルを直接ダブルクリックしてブラウザで開いている（ローカル環境）場合、セキュリティ制限によりREADMEを自動で読み込むことができません。\nサーバーにアップロードするか、ローカルサーバーを立ち上げて確認してください。";
+        console.error("READMEの取得に失敗:", error);
+    }
+}
