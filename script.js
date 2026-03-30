@@ -376,8 +376,15 @@ function goToEditor() {
     document.getElementById('settings-btn').style.display = 'none';
     updateGameMusic(); 
 }
-function openBookModal() { renderMonsterList(); document.getElementById('book-modal').style.display='flex'; }
-function closeBookModal() { document.getElementById('book-modal').style.display='none'; }
+function openBookModal() { 
+    renderMonsterList(); 
+    document.getElementById('book-modal').style.display='flex'; 
+    document.getElementById('settings-btn').style.display='none'; 
+}
+function closeBookModal() { 
+    document.getElementById('book-modal').style.display='none'; 
+    document.getElementById('settings-btn').style.display='block'; 
+}
 
 function spawnMonstersInField() {
     const area = document.getElementById('monster-field-area'); if (!area) return;
@@ -804,6 +811,7 @@ function updateGameMusic() {
 }
 document.addEventListener('click', () => { updateGameMusic(); }, { once: false });
 
+// ▼▼▼ ここから追加（README読み込み処理） ▼▼▼
 async function showGameDescription() {
     const modal = document.getElementById('description-modal');
     const content = document.getElementById('readme-content');
@@ -815,7 +823,8 @@ async function showGameDescription() {
         const text = await response.text();
         content.textContent = text;
     } catch (error) {
-        content.textContent = "【エラー】README.mdの読み込みに失敗しました。\n\n※ファイルを直接ダブルクリックしてブラウザで開いている（ローカル環境）場合、セキュリティ制限によりREADMEを自動で読み込むことができません。\nサーバーにアップロードするか、ローカルサーバーを立ち上げて確認してください。";
+        content.textContent = "【エラー】README.mdの読み込みに失敗しました。\n\n※ローカル環境（ファイルを直接ブラウザで開いている場合）ではセキュリティ制限により読み込めない場合があります。";
         console.error("READMEの取得に失敗:", error);
     }
 }
+// ▲▲▲ ここまで追加 ▲▲▲
